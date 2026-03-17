@@ -2,7 +2,7 @@
 
 A Django 4.2+ SaaS application for AI-automated LinkedIn posting, featuring a hybrid Django + FastAPI architecture for maximum speed and scalability.
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -53,7 +53,7 @@ Development Setup (Separate Ports):
 └─────────────────────┘  └─────────────────────┘  └─────────────────────────────┘
 ```
 
-## 📦 Application Components
+## Application Components
 
 ```
 momodu/
@@ -163,7 +163,7 @@ momodu/
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 🔐 Authentication Flow
+## Authentication Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -190,7 +190,7 @@ momodu/
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 📊 Celery Task Flow
+## Celery Task Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -486,6 +486,7 @@ class PostResponse(PostBase):
 
 ### DRY: Celery Task Base
 
+
 ```python
 # apps/posts/tasks/decorators.py
 from celery import shared_task
@@ -551,7 +552,7 @@ class LinkedinClient:
             return res.headers.get("x-restli-id")
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -729,7 +730,7 @@ curl -X GET "http://localhost:8001/api/v1/posts" \
   -H "Authorization: Bearer <token>"
 ```
 
-## 🧪 Development Workflow
+## Development Workflow
 
 ### Code Style
 
@@ -769,7 +770,7 @@ pytest tests/test_posts.py
 4. **Celery Tasks** → Add to `apps/<app>/tasks/tasks.py`
 5. **URL Configuration** → Update `api/main.py`
 
-## 🔒 Security Considerations
+## Security Considerations
 
 - JWT tokens expire after 30 minutes (configurable)
 - Passwords are hashed with bcrypt
@@ -780,7 +781,7 @@ pytest tests/test_posts.py
 - **TODO**: Add 2FA support for production
 - **TODO**: Implement password strength policies
 
-## 📈 Performance
+## Performance
 
 - **FastAPI**: Handles high-throughput API requests with async/await
 - **Django**: Manages admin and background tasks
@@ -789,7 +790,7 @@ pytest tests/test_posts.py
 - **Daphne**: ASGI server for concurrent connections
 - **Celery**: Distributed task queue with retry logic
 
-## 🚢 Production Deployment
+## Production Deployment
 
 ### Using Docker
 
