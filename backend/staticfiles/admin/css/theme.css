@@ -1,0 +1,744 @@
+/*
+Django Admin Theme - Dark Indigo
+Based on Tailwind's indigo-600 (#4f46e5) and indigo-700 (#4338ca)
+*/
+
+/* ==================== */
+/* Base Colors - Dark Indigo Theme */
+/* ==================== */
+:root {
+    --indigo-600: #4f46e5;
+    --indigo-700: #4338ca;
+    --indigo-800: #3730a3;
+    --indigo-900: #312e81;
+    --indigo-500: #6366f1;
+    --indigo-400: #818cf8;
+    --indigo-100: #e0e7ff;
+    --vscode-bg: #1e1e2e;
+    --vscode-bg-secondary: #282838;
+    --vscode-bg-hover: #323244;
+    --vscode-bg-active: #3f3f56;
+    --vscode-text: #cdd6f4;
+    --vscode-text-bright: #f5f5f5;
+    --vscode-border: #3f3f56;
+    --vscode-green: #a3e635;
+    --vscode-orange: #fbbf24;
+    --vscode-red: #f87171;
+    --vscode-grey: #a1a1aa;
+}
+body {
+    outline: 5px solid rgb(199, 175, 252)(255, 153, 0) !important;
+}
+/* ==================== */
+/* Header Styling       */
+/* ==================== */
+#header {
+    background: var(--indigo-700) !important;
+    border-bottom: 3px solid var(--indigo-600) !important;
+    box-shadow: 0 2px 10px rgba(67, 56, 202, 0.4);
+}
+
+#header a {
+    color: var(--vscode-text-bright) !important;
+    font-weight: 500;
+}
+
+#header a:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border-radius: 4px;
+}
+
+#user-tools a {
+    color: var(--vscode-text-bright) !important;
+}
+
+/* ==================== */
+/* Breadcrumbs        */
+/* ==================== */
+#breadcrumbs {
+    background-color: var(--indigo-700) !important;
+    padding: 12px 16px !important;
+    border-bottom: 1px solid var(--indigo-600) !important;
+}
+
+#breadcrumbs a {
+    color: var(--vscode-text-bright) !important;
+    text-decoration: none !important;
+    font-weight: 500;
+}
+
+#breadcrumbs a:hover {
+    color: var(--indigo-100) !important;
+    text-decoration: underline !important;
+}
+
+/* ==================== */
+/* Nav Sidebar        */
+/* ==================== */
+#nav-sidebar {
+    background-color: var(--indigo-800) !important;
+    border-right: 1px solid var(--indigo-600) !important;
+}
+
+#nav-sidebar .nav-link {
+    color: var(--vscode-text) !important;
+}
+
+#nav-sidebar .nav-link:hover {
+    background-color: var(--indigo-700) !important;
+    color: var(--vscode-text-bright) !important;
+}
+
+#nav-sidebar .nav-link.active {
+    background-color: var(--indigo-700) !important;
+    color: var(--vscode-text-bright) !important;
+}
+
+/* ==================== */
+/* Module Headers       */
+/* ==================== */
+.collapse h2,
+.collapsible h2 {
+    background: var(--indigo-700) !important;
+    border-left: 4px solid var(--indigo-600) !important;
+    color: var(--vscode-text-bright) !important;
+    padding: 12px 15px !important;
+    margin: 0 !important;
+    border-radius: 0 6px 6px 0 !important;
+}
+
+.module h2, .module caption, .inline-group h2 {
+    margin: 0;
+    padding-left: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-weight: 400;
+    font-size: 0.8125rem;
+    text-align: left;
+    background: var(--indigo-800) !important;
+    color: var(--header-link-color);
+}
+
+div.breadcrumbs {
+    background: var(--indigo-900);
+    padding: 10px 40px;
+    border: none;
+    color: var(--breadcrumbs-fg);
+    text-align: left;
+}    
+
+.login #content-main input[type="text"], .login #content-main input[type="password"] {
+    background: var(--vscode-bg) !important;
+    border: 1px solid var(--vscode-border) !important;
+    border-radius: 6px !important;
+    padding: 12px !important;
+    font-size: 20px !important;
+    font-weight: 480 !important;
+    padding: 15px !important;
+}
+
+.login #container {
+    background: var(--body-bg);
+    border: 1px solid var(--hairline-color);
+    border-radius: 4px;
+    overflow: hidden;
+    width: 28em;
+    max-width: 500px !important;
+    min-width: 80%;
+    margin: 100px auto;
+    height: auto;
+    width: 100%;
+}
+
+@media (max-width: 1024px) {
+    #container {
+        min-width: 0;
+    }
+}
+
+.collapse h2,
+.collapsible h2 {
+    background: var(--indigo-800) !important;
+}
+
+/* ==================== */
+/* Fieldset Styling    */
+/* ==================== */
+fieldset {
+    border: 1px solid var(--vscode-border) !important;
+    border-radius: 8px !important;
+    background-color: var(--vscode-bg-secondary) !important;
+    padding: 15px !important;
+    margin-bottom: 15px !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+fieldset.collapsed {
+    border: 1px solid var(--vscode-border) !important;
+}
+
+fieldset.VSCodeBlue {
+    border-left: 4px solid var(--indigo-700) !important;
+    background-color: rgba(67, 56, 202, 0.1) !important;
+}
+
+fieldset.VSCodeRed {
+    border-left: 4px solid var(--vscode-red) !important;
+    background-color: rgba(248, 113, 113, 0.08) !important;
+}
+
+/* ==================== */
+/* Form Fields         */
+/* ==================== */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="url"],
+input[type="search"],
+textarea,
+select {
+    background-color: var(--vscode-bg) !important;
+    border: 1px solid var(--vscode-border) !important;
+    color: var(--vscode-text) !important;
+    border-radius: 6px !important;
+    padding: 10px 12px !important;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none !important;
+    border-color: var(--indigo-600) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2) !important;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+    border-color: var(--indigo-600) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2) !important;
+}
+
+/* ==================== */
+/* Buttons             */
+/* ==================== */
+.toggle-nav-sidebar {
+    background: var(--indigo-900) !important;
+    border-radius: none !important;
+
+}
+
+#changelist .actions select {
+    vertical-align: top;
+    padding: 20px !important;
+    height: 1.5rem;
+    color: #fffbfb !important;
+    /* border: 1px solid var(--border-color); */
+    border-radius: 4px;
+    font-size: 0.875rem;
+    /* padding: 0 0 0 4px; */
+    margin: 4px;
+    margin-left: 10px;
+}
+
+#user-tools, #logout-form button {
+    padding: 10px 10px!important; 
+    font-size: 14px !important;
+
+}
+
+button, input[type="submit"], input[type="button"], .submit-row input {
+    background: var(--indigo-600) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 6px !important; */
+    padding: 15px 15px !important;
+    font-size: 16px !important;
+    padding-right: 30px !important;
+    padding-left: 30px !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
+}
+
+
+a:link, a:visited {
+    color:#0018ff;
+    text-decoration: none;
+    transition: color 0.15s, background 0.15s;
+}
+
+transitions style {
+    color: var(--indigo-400) !important;
+}
+
+#changelist .actions .button {
+    padding-bottom: 20px !important;
+
+}
+.theme-toggle {
+    cursor: pointer;
+    border: none;
+    padding: 12px 12px !important;
+
+
+}
+
+table thead th .text a {
+    display: block;
+    cursor: pointer;
+    padding: 8px 10px;
+    color: #7fc06b !important;
+}
+table thead th .text a:hover {
+    background-color: var(--indigo-800);
+        color: #70ee49 !important;
+}
+
+
+button:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover {
+    background: var(--indigo-500) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(79, 70, 229, 0.4);
+}
+
+button.default,
+input[type="submit"].default {
+    background: var(--indigo-700) !important;
+}
+
+button.default:hover,
+input[type="submit"].default:hover {
+    background: var(--indigo-600) !important;
+}
+
+/* ==================== */
+/* Tables / List       */
+/* ==================== */
+#changelist {
+    background-color: transparent !important;
+}
+
+#changelist table {
+    border-collapse: separate !important;
+    border-spacing: 0;
+    width: 100% !important;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: var(--vscode-bg-secondary) !important;
+}
+
+#changelist thead th {
+    background: linear-gradient(135deg, var(--indigo-700) 0%, var(--indigo-800) 100%) !important;
+    color: var(--vscode-text-bright) !important;
+    border-bottom: 2px solid var(--indigo-600) !important;
+    padding: 14px !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+#changelist tbody tr {
+    border-bottom: 1px solid var(--vscode-border) !important;
+    transition: background-color 0.2s;
+}
+
+#changelist tbody tr:hover {
+    background-color: var(--vscode-bg-hover) !important;
+}
+
+#changelist tbody td {
+    color: var(--vscode-text) !important;
+    padding: 12px 14px !important;
+}
+
+#changelist tbody tr:nth-child(odd) {
+    background-color: var(--vscode-bg) !important;
+}
+
+#changelist tbody tr:nth-child(odd):hover {
+    background-color: var(--vscode-bg-hover) !important;
+}
+
+/* Row actions on hover */
+#changelist tbody tr:hover .rowactions {
+    opacity: 1;
+}
+
+/* ==================== */
+/* Pagination          */
+/* ==================== */
+.paginator {
+    background: var(--vscode-bg-secondary) !important;
+    color: var(--vscode-text) !important;
+    padding: 12px 16px !important;
+    border-radius: 8px !important;
+    margin-top: 15px;
+}
+
+.paginator a {
+    color: var(--indigo-400) !important;
+    text-decoration: none !important;
+    padding: 6px 12px !important;
+    border-radius: 4px !important;
+    transition: all 0.2s;
+}
+
+.paginator a:hover {
+    background: var(--indigo-600) !important;
+    color: white !important;
+}
+
+.paginator span.this-page {
+    background: var(--indigo-600) !important;
+    color: white !important;
+    padding: 6px 12px !important;
+    border-radius: 4px !important;
+    font-weight: 500;
+}
+
+/* ==================== */
+/* Messages            */
+/* ==================== */
+.messagelist {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.messagelist li {
+    padding: 14px 18px !important;
+    border-radius: 0 !important;
+    margin: 0 0 10px 0 !important;
+    font-weight: 500;
+}
+
+.messagelist li.success {
+    background-color: rgba(163, 230, 53, 0.15) !important;
+    color: var(--vscode-green) !important;
+    border-left: 4px solid var(--vscode-green) !important;
+}
+
+.messagelist li.warning {
+    background-color: rgba(251, 191, 36, 0.15) !important;
+    color: var(--vscode-orange) !important;
+    border-left: 4px solid var(--vscode-orange) !important;
+}
+
+.messagelist li.error {
+    background-color: rgba(248, 113, 113, 0.15) !important;
+    color: var(--vscode-red) !important;
+    border-left: 4px solid var(--vscode-red) !important;
+}
+
+/* ==================== */
+/* Object Tools        */
+/* ==================== */
+.object-tools {
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+    margin-bottom: 15px !important;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.object-tools a {
+    background: var(--indigo-600) !important;
+    color: white !important;
+    padding: 8px 14px !important;
+    border-radius: 6px !important;
+    font-size: 12px !important;
+    font-weight: 500;
+    text-decoration: none !important;
+    transition: all 0.2s;
+}
+
+.object-tools a:hover {
+    background: var(--indigo-500) !important;
+    transform: translateY(-1px);
+}
+
+.object-tools a.add-link {
+    background: linear-gradient(135deg, var(--vscode-green) 0%, #84cc16 100%) !important;
+}
+
+.object-tools a.add-link:hover {
+    background: linear-gradient(135deg, #84cc16 0%, var(--vscode-green) 100%) !important;
+}
+
+/* ==================== */
+/* Filter Horizontal   */
+/* ==================== */
+.filter-container {
+    background: var(--vscode-bg-secondary) !important;
+    border: 1px solid var(--vscode-border) !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+}
+
+.filter-container h3 {
+    background: linear-gradient(135deg, var(--indigo-700) 0%, var(--indigo-800) 100%) !important;
+    color: white !important;
+    padding: 12px 16px !important;
+    margin: 0 !important;
+    font-weight: 600;
+}
+
+.filter-container select {
+    width: 100% !important;
+    background: var(--vscode-bg) !important;
+    border: none !important;
+    padding: 12px !important;
+    color: var(--vscode-text) !important;
+}
+
+/* ==================== */
+/* Date/Time Pickers   */
+/* ==================== */
+.ui-datepicker {
+    background: var(--vscode-bg-secondary) !important;
+    border: 1px solid var(--vscode-border) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.ui-datepicker-header {
+    background: linear-gradient(135deg, var(--indigo-700) 0%, var(--indigo-800) 100%) !important;
+    color: white !important;
+    border-radius: 7px 7px 0 0 !important;
+    padding: 12px !important;
+    font-weight: 600;
+}
+
+.ui-datepicker-calendar th {
+    background: var(--vscode-bg) !important;
+    color: var(--vscode-text) !important;
+    padding: 10px !important;
+    font-weight: 600;
+}
+
+.ui-datepicker-calendar td a {
+    color: var(--vscode-text) !important;
+    padding: 10px !important;
+    border-radius: 4px !important;
+}
+
+.ui-datepicker-calendar td a:hover {
+    background: var(--indigo-600) !important;
+    color: white !important;
+}
+
+.ui-datepicker-calendar .ui-state-active {
+    background: var(--indigo-600) !important;
+    color: white !important;
+    border-radius: 4px !important;
+}
+
+.ui-datepicker-calendar .ui-state-highlight {
+    background: var(--vscode-bg-hover) !important;
+    border-radius: 4px !important;
+}
+
+/* ==================== */
+/* Related Widgets     */
+/* ==================== */
+.related-widget-wrapper {
+    background: var(--vscode-bg-secondary) !important;
+    border: 1px solid var(--vscode-border) !important;
+    border-radius: 6px !important;
+}
+
+.related-widget-wrapper select {
+    background: var(--vscode-bg) !important;
+    border: none !important;
+    padding: 10px !important;
+}
+
+.related-widget-wrapper .selector-add {
+    background: var(--vscode-green) !important;
+    color: white !important;
+    border-radius: 4px !important;
+    padding: 8px 12px !important;
+}
+
+.related-widget-wrapper .selector-remove {
+    background: var(--vscode-red) !important;
+    color: white !important;
+    border-radius: 4px !important;
+    padding: 8px 12px !important;
+}
+
+/* ==================== */
+/* Inline Admin        */
+/* ==================== */
+.inline-group {
+    background: var(--vscode-bg-secondary) !important;
+    border: 1px solid var(--vscode-border) !important;
+    border-radius: 8px !important;
+    padding: 15px !important;
+    margin-bottom: 15px !important;
+}
+
+.inline-group h2 {
+    background: var(--indigo-700) !important;
+    color: white !important;
+    padding: 12px 16px !important;
+    margin: -15px -15px 15px -15px !important;
+    border-radius: 8px 8px 0 0 !important;
+    font-weight: 600;
+}
+
+.inline-group .tabular {
+    background: var(--vscode-bg) !important;
+    border-radius: 6px !important;
+}
+
+.inline-group .tabular input {
+    background: var(--vscode-bg-secondary) !important;
+    border: 1px solid var(--vscode-border) !important;
+    border-radius: 4px !important;
+}
+
+/* ==================== */
+/* Login Page          */
+/* ==================== */
+.login #header {
+    background: var(--indigo-700) !important;
+}
+
+.login #content {
+    background: var(--vscode-bg-secondary) !important;
+    border-radius: 12px !important;
+    padding: 40px !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    max-width: 400px;
+    margin: 50px auto;
+}
+
+.login #content-main input[type="text"],
+.login #content-main input[type="password"] {
+    background: var(--vscode-bg) !important;
+    border: 1px solid var(--vscode-border) !important;
+    border-radius: 6px !important;
+    padding: 12px !important;
+}
+
+.login #content-main input[type="text"]:focus,
+.login #content-main input[type="password"]:focus {
+    border-color: var(--indigo-600) !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2) !important;
+}
+
+/* ==================== */
+/* Misc                */
+/* ==================== */
+.readonly {
+    background: var(--vscode-bg) !important;
+    color: var(--vscode-text) !important;
+    padding: 10px 12px !important;
+    border-radius: 6px !important;
+    border: 1px solid var(--vscode-border) !important;
+}
+
+.empty-form {
+    color: var(--vscode-grey) !important;
+    font-style: italic !important;
+    padding: 20px !important;
+}
+
+/* Calendar shortcut */
+.datetimeshortcuts {
+    background: var(--indigo-600) !important;
+    border-radius: 50% !important;
+    width: 28px !important;
+    height: 28px !important;
+    line-height: 28px !important;
+    text-align: center !important;
+    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3);
+}
+
+.datetimeshortcuts a {
+    color: white !important;
+    text-decoration: none !important;
+    font-size: 16px !important;
+}
+
+/* Help text */
+.help,
+p.help {
+    color: var(--vscode-grey) !important;
+    font-size: 12px !important;
+    font-style: italic !important;
+    margin-top: 6px !important;
+}
+
+/* Required field indicator */
+.required {
+    color: var(--indigo-400) !important;
+    font-weight: 600;
+}
+
+/* Error highlight */
+.error {
+    border-color: var(--vscode-red) !important;
+}
+
+.errorlist {
+    background: rgba(248, 113, 113, 0.1) !important;
+    border-left: 3px solid var(--vscode-red) !important;
+    padding: 12px 15px !important;
+    margin: 8px 0 !important;
+    color: var(--vscode-red) !important;
+    border-radius: 0 6px 6px 0 !important;
+}
+
+/* File input */
+input[type="file"] {
+    background: var(--vscode-bg) !important;
+    border: 2px dashed var(--vscode-border) !important;
+    padding: 30px !important;
+    border-radius: 8px !important;
+    transition: all 0.2s;
+}
+
+input[type="file"]:hover {
+    border-color: var(--indigo-600) !important;
+}
+
+/* Checkbox/Radio */
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: var(--indigo-400) !important;
+    width: 18px !important;
+    height: 18px !important;
+}
+
+/* Result table styling */
+#result_list tbody tr:hover {
+    background-color: var(--vscode-bg-hover) !important;
+}
+
+/* Actions row styling */
+#actions {
+    border-radius: 8px !important;
+    padding: 10px 15px !important;
+}
+
+/* Selector styling */
+.selector {
+    border-radius: 8px !important;
+    padding: 15px !important;
+}
+
+.selector h2 {
+    background: var(--indigo-700) !important;
+    color: white !important;
+    padding: 10px 15px !important;
+    border-radius: 6px !important;
+}

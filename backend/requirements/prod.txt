@@ -1,0 +1,17 @@
+# Production dependencies
+-r base.txt
+
+# Gunicorn for production WSGI
+gunicorn>=21.2.0
+
+# Monitoring
+sentry-sdk>=1.38.0
+
+# Production ASGI server
+daphne>=4.0.0
+
+# Database pooling
+psycopg2-binary>=2.9.9
+
+# Redis connection pooling
+hiredis>=2.2.0
