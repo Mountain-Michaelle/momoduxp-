@@ -167,16 +167,16 @@ uv run mypy .
 
 ```bash
 uv run pytest
-uv run pytest --cov=api --cov=backend
+uv run pytest --cov=apps.api --cov=backend
 ```
 
 ### Adding a feature
 
 1. **Django model** → `apps/<app>/models.py`
 2. **Shared schema** → `shared/schemas.py`
-3. **FastAPI route** → `api/routers/`
+3. **FastAPI route** → `apps/api/v1/routers/`
 4. **Celery task** → `apps/<app>/tasks/`
-5. **Register route** → `api/main.py`
+5. **Register route** → `apps/api/main.py`
 
 ---
 
@@ -202,12 +202,17 @@ celery -A shared beat -l info
 
 ```
 backend/
-├── api/              # FastAPI app (async)
-│   ├── main.py
-│   ├── config.py
-│   ├── routers/      # auth, posts, ai
-│   └── tasks/
-├── apps/             # Django apps
+├── apps/             # Django + FastAPI apps
+│   ├── api/         # FastAPI app (async)
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   └── v1/      # API version 1
+│   │       ├── auth/        # JWT & auth dependencies
+│   │       ├── routers/     # auth, posts, ai endpoints
+│   │       ├── services/    # auth business logic
+│   │       ├── tasks/       # Celery task triggers
+│   │       ├── repositories/# DB query helpers
+│   │       └── infrastructure/ # rate limiting
 │   ├── accounts/     # Users & subscriptions
 │   ├── posts/        # Post scheduling
 │   ├── webhooks/     # Webhook delivery
