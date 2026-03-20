@@ -89,7 +89,7 @@ def main() -> None:
     # ------------------------------------------------------------------------------
 
     config = uvicorn.Config(
-        app="api.main:app",
+        app="apps.api.main:app",
         host=args.host,
         port=args.port,
         reload=args.reload,
