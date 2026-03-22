@@ -173,7 +173,7 @@ uv run pytest --cov=apps.api --cov=backend
 ### Adding a feature
 
 1. **Django model** → `apps/<app>/models.py`
-2. **Shared schema** → `shared/schemas.py`
+2. **Shared schema** → `shared/schemas/` (users.py, posts.py) or `shared/schemas.py` for backward compatibility
 3. **FastAPI route** → `apps/api/v1/routers/`
 4. **Celery task** → `apps/<app>/tasks/`
 5. **Register route** → `apps/api/main.py`
@@ -225,8 +225,16 @@ backend/
 │   └── config/       # base / dev / prod
 ├── shared/           # Shared between Django & FastAPI
 │   ├── database.py   # SQLAlchemy async
-│   ├── models.py     # SQLAlchemy ORM
-│   ├── schemas.py    # Pydantic schemas
+│   ├── models.py     # SQLAlchemy ORM (re-exports from models/)
+│   ├── models/       # Separated SQLAlchemy models
+│   │   ├── __init__.py
+│   │   ├── users.py  # User & SocialPlatformAccount
+│   │   └── posts.py  # ScheduledPost
+│   ├── schemas.py    # Pydantic schemas (re-exports from schemas/)
+│   ├── schemas/      # Separated Pydantic schemas
+│   │   ├── __init__.py
+│   │   ├── users.py  # User schemas, Platform, SocialAccount
+│   │   └── posts.py  # Post schemas, PostStatus
 │   └── celery.py     # Celery instance
 ├── requirements/
 │   ├── base.txt
