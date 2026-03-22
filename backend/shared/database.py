@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import text
 
-from api.config import api_settings
+from apps.api.config import api_settings
 
 logger = logging.getLogger(__name__)
 

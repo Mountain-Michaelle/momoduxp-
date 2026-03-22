@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database import get_db
 from shared.exceptions import AuthenticationException
-from shared.models import User
+from shared.models.users import User
 from apps.api.v1.auth.jwt import decode_token, ACCESS
 from apps.api.v1.repositories.user import get_user_by_id
 from apps.api.config import api_settings

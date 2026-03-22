@@ -12,15 +12,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from shared.database import get_db
-from shared.schemas import (
+from shared.schemas import PaginatedResponse
+from shared.schemas.posts import (
     PostCreate,
     PostUpdate,
     PostResponse,
     PostStatus as PostStatusEnum,
-    PaginatedResponse,
 )
 
-from shared.models import User, ScheduledPost
+from shared.models.users import User
+from shared.models.posts import ScheduledPost
 from apps.api.v1.auth.dependencies import get_current_active_user
 from apps.api.v1.tasks.post_task import trigger_publish_post, trigger_send_for_approval
 

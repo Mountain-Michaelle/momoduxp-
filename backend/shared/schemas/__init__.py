@@ -1,47 +1,36 @@
 """
-Shared Pydantic schemas for FastAPI.
-These schemas mirror Django models for API validation.
-DRY: Centralized schema definitions used by both Django and FastAPI.
-
-Version: 1.0.0
-
-NOTE: For better separation of concerns, import from specific modules:
-    - from shared.schemas.users import UserResponse, UserCreate, etc.
-    - from shared.schemas.posts import PostResponse, PostCreate, etc.
+Shared Pydantic schema exports for FastAPI.
 """
 
 from datetime import datetime
-from typing import List, Optional, Any
-from pydantic import BaseModel, Field, HttpUrl, field_validator
-from enum import Enum
+from typing import Any, Optional
 import uuid
 
-# Re-export from separated modules for backward compatibility
-# Users and Posts - version 1.0.0
+from pydantic import Field
+from enum import Enum
+
 from shared.schemas.users import (
     BaseSchema,
-    SubscriptionPlan,
-    UserBase,
-    UserCreate,
-    UserUpdate,
-    UserResponse,
-    UserWithQuota,
     Platform,
     SocialAccountBase,
     SocialAccountCreate,
     SocialAccountResponse,
+    SubscriptionPlan,
+    UserBase,
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+    UserWithQuota,
 )
-
 from shared.schemas.posts import (
-    PostStatus,
+    PostActionResponse,
     PostBase,
     PostCreate,
-    PostUpdate,
     PostResponse,
+    PostStatus,
     PostSubmitRequest,
-    PostActionResponse,
+    PostUpdate,
 )
-
 from shared.schemas.notifications import (
     NotificationConnectionResponse,
     NotificationWebhookEventResponse,
@@ -53,12 +42,7 @@ from shared.schemas.notifications import (
 )
 
 
-# ==============================================================================
-# AI Processing Schemas
-# ==============================================================================
-
 class AITone(str, Enum):
-    """AI content tone options."""
     PROFESSIONAL = "professional"
     CASUAL = "casual"
     INSPIRING = "inspiring"
@@ -66,7 +50,6 @@ class AITone(str, Enum):
 
 
 class AIRequest(BaseSchema):
-    """Schema for AI processing request."""
     prompt: str
     content_type: str = "post"
     platform: Optional[Platform] = None
@@ -75,24 +58,17 @@ class AIRequest(BaseSchema):
 
 
 class AIResponse(BaseSchema):
-    """Schema for AI processing response."""
     generated_content: str
     model_used: str
     tokens_used: int
 
 
 class AIVariationRequest(BaseSchema):
-    """Request for generating multiple variations."""
     content: str
     count: int = Field(default=3, ge=1, le=5)
 
 
-# ==============================================================================
-# Authentication Schemas
-# ==============================================================================
-
 class Token(BaseSchema):
-    """Schema for JWT token response."""
     access_token: str
     refresh_token: str
     user_id: str
@@ -101,29 +77,21 @@ class Token(BaseSchema):
 
 
 class TokenData(BaseSchema):
-    """Schema for token payload."""
     user_id: Optional[uuid.UUID] = None
     exp: Optional[datetime] = None
     type: Optional[str] = None
 
 
 class LoginRequest(BaseSchema):
-    """Schema for login request."""
     username: str
     password: str
 
 
 class TokenRefreshRequest(BaseSchema):
-    """Schema for token refresh request."""
     refresh_token: str
 
 
-# ==============================================================================
-# Usage & Quota Schemas
-# ==============================================================================
-
 class UsageQuotaResponse(BaseSchema):
-    """Schema for usage quota response."""
     posts_used: int
     posts_limit: int
     ai_used: int
@@ -134,7 +102,6 @@ class UsageQuotaResponse(BaseSchema):
 
 
 class PlanDetails(BaseSchema):
-    """Schema for plan details."""
     name: SubscriptionPlan
     posts_limit: int
     ai_limit: int
@@ -142,12 +109,7 @@ class PlanDetails(BaseSchema):
     price_monthly: Optional[float] = None
 
 
-# ==============================================================================
-# Webhook Schemas
-# ==============================================================================
-
 class WebhookEventType(str, Enum):
-    """Webhook event types."""
     POST_CREATED = "post.created"
     POST_UPDATED = "post.updated"
     POST_PUBLISHED = "post.published"
@@ -157,23 +119,20 @@ class WebhookEventType(str, Enum):
 
 
 class WebhookCreate(BaseSchema):
-    """Schema for creating a webhook endpoint."""
-    url: HttpUrl
-    events: List[WebhookEventType]
-    secret: Optional[str] = None  # Auto-generated if not provided
+    url: str
+    events: list[WebhookEventType]
+    secret: Optional[str] = None
 
 
 class WebhookResponse(BaseSchema):
-    """Schema for webhook endpoint response."""
     id: uuid.UUID
     url: str
-    events: List[str]
+    events: list[str]
     is_active: bool
     created_at: datetime
 
 
 class WebhookDeliveryResponse(BaseSchema):
-    """Schema for webhook delivery response."""
     id: uuid.UUID
     event: str
     status_code: Optional[int] = None
@@ -182,31 +141,20 @@ class WebhookDeliveryResponse(BaseSchema):
     created_at: datetime
 
 
-# ==============================================================================
-# Pagination Schemas
-# ==============================================================================
-
 class PaginationParams(BaseSchema):
-    """Pagination parameters."""
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 
 
 class PaginatedResponse(BaseSchema):
-    """Paginated response wrapper."""
-    items: List[Any]
+    items: list[Any]
     total: int
     page: int
     page_size: int
     pages: int
 
 
-# ==============================================================================
-# Health Check Schemas
-# ==============================================================================
-
 class HealthCheck(BaseSchema):
-    """Schema for health check response."""
     status: str
     database: str
     redis: str
@@ -215,9 +163,52 @@ class HealthCheck(BaseSchema):
 
 
 class HealthCheckDetailed(HealthCheck):
-    """Schema for detailed health check response."""
-    dependencies: dict
+    dependencies: dict[str, Any]
     uptime_seconds: float
 
 
-__version__ = "1.0.0"
+__all__ = [
+    "BaseSchema",
+    "SubscriptionPlan",
+    "Platform",
+    "UserBase",
+    "UserCreate",
+    "UserUpdate",
+    "UserResponse",
+    "UserWithQuota",
+    "SocialAccountBase",
+    "SocialAccountCreate",
+    "SocialAccountResponse",
+    "PostStatus",
+    "PostBase",
+    "PostCreate",
+    "PostUpdate",
+    "PostResponse",
+    "PostSubmitRequest",
+    "PostActionResponse",
+    "NotificationConnectionResponse",
+    "NotificationWebhookEventResponse",
+    "NotificationDeliveryResponse",
+    "NotificationWebhookReceiveResponse",
+    "TelegramConnectLinkResponse",
+    "TelegramNotificationSendRequest",
+    "TelegramNotificationSendResponse",
+    "AITone",
+    "AIRequest",
+    "AIResponse",
+    "AIVariationRequest",
+    "Token",
+    "TokenData",
+    "LoginRequest",
+    "TokenRefreshRequest",
+    "UsageQuotaResponse",
+    "PlanDetails",
+    "WebhookEventType",
+    "WebhookCreate",
+    "WebhookResponse",
+    "WebhookDeliveryResponse",
+    "PaginationParams",
+    "PaginatedResponse",
+    "HealthCheck",
+    "HealthCheckDetailed",
+]

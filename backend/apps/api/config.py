@@ -51,6 +51,8 @@ class APISettings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.openai.com/v1/chat/completions"
     LINKEDIN_BASE_URL: str = "https://api.linkedin.com/v2"
     TELEGRAM_BASE_URL: str = "https://api.telegram.org"
+    TELEGRAM_BOT_TOKEN: Optional[str] = None
+    TELEGRAM_BOT_USERNAME: str = "momoduxp_bot"
 
     # Redis settings
     REDIS_URL: str = "redis://localhost:6379/0"

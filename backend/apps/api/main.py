@@ -11,7 +11,9 @@ from fastapi.exceptions import RequestValidationError
 import logging
 
 from apps.api.config import api_settings
+from apps.api.v1.notifications import telegram as telegram_notifications
 from apps.api.v1.routers import posts, auth, ai
+from apps.api.v1.webhooks import notifications as notification_webhooks
 from shared.database import init_db, close_db
 
 # Lazy import to avoid django.setup() at module level
@@ -128,6 +130,8 @@ async def detailed_health_check():
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(posts.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
+app.include_router(telegram_notifications.router, prefix="/api/v1")
+app.include_router(notification_webhooks.router, prefix="/api/v1")
 
 
 # Root endpoint
@@ -143,4 +147,4 @@ async def root():
 
 
 # Import shared models for type checking
-from shared.models import User  # noqa: F401
+from shared.models.users import User  # noqa: F401

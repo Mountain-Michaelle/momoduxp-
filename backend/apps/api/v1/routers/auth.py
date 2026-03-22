@@ -5,8 +5,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database import get_db
-from shared.schemas import Token, LoginRequest, UserCreate, UserResponse
-from shared.models import User
+from shared.schemas import Token, LoginRequest
+from shared.schemas.users import UserCreate, UserResponse
+from shared.models.users import User
 from apps.api.v1.services.auth import authenticate_user, issue_access_token, issue_tokens, register_user
 from apps.api.v1.auth.dependencies import get_current_user
 

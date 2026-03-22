@@ -8,7 +8,7 @@ from sqlalchemy import select, or_
 from passlib.context import CryptContext
 from passlib.exc import UnknownHashError
 
-from shared.models import User
+from shared.models.users import User
 from shared.exceptions import (
     AuthenticationException,
     ConflictException,
