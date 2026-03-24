@@ -283,7 +283,7 @@ async def platform_health_check(platform: str) -> dict[str, str]:
     return {"status": "healthy", "service": f"{platform}-webhook"}
 
 
-@router.post("/{platform}", response_model=NotificationWebhookReceiveResponse)
+@router.post("/{platform}/webhook", response_model=NotificationWebhookReceiveResponse)
 async def receive_notification_webhook(
     platform: str,
     payload: dict[str, Any] = Body(...),

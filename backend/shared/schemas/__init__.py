@@ -39,6 +39,7 @@ from shared.schemas.notifications import (
     TelegramConnectLinkResponse,
     TelegramNotificationSendRequest,
     TelegramNotificationSendResponse,
+    TelegramWebhookConfigResponse,
 )
 
 
@@ -193,6 +194,7 @@ __all__ = [
     "TelegramConnectLinkResponse",
     "TelegramNotificationSendRequest",
     "TelegramNotificationSendResponse",
+    "TelegramWebhookConfigResponse",
     "AITone",
     "AIRequest",
     "AIResponse",

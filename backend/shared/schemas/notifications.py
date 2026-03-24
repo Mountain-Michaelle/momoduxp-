@@ -105,6 +105,13 @@ class TelegramConnectLinkResponse(NotificationBaseSchema):
     detail: str
 
 
+class TelegramWebhookConfigResponse(NotificationBaseSchema):
+    ok: bool
+    webhook_url: Optional[str] = None
+    telegram_response: dict[str, Any]
+    detail: str
+
+
 __all__ = [
     "NotificationConnectionResponse",
     "NotificationWebhookEventResponse",
@@ -113,4 +120,5 @@ __all__ = [
     "TelegramNotificationSendRequest",
     "TelegramNotificationSendResponse",
     "TelegramConnectLinkResponse",
+    "TelegramWebhookConfigResponse",
 ]

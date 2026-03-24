@@ -83,8 +83,8 @@ async def authenticate_user(
     result = await db.execute(
         select(User).where(
             or_(
-                User.username == identifier,
-                User.email == identifier,
+                User.username == identifier.lower(),
+                User.email == identifier.lower(),
             )
         )
     )

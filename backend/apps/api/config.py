@@ -53,6 +53,7 @@ class APISettings(BaseSettings):
     TELEGRAM_BASE_URL: str = "https://api.telegram.org"
     TELEGRAM_BOT_TOKEN: Optional[str] = None
     TELEGRAM_BOT_USERNAME: str = "momoduxp_bot"
+    PUBLIC_API_BASE_URL: Optional[str] = None
 
     # Redis settings
     REDIS_URL: str = "redis://localhost:6379/0"

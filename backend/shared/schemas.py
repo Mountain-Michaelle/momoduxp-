@@ -50,6 +50,7 @@ from shared.schemas.notifications import (
     TelegramConnectLinkResponse,
     TelegramNotificationSendRequest,
     TelegramNotificationSendResponse,
+    TelegramWebhookConfigResponse,
 )
 
 
