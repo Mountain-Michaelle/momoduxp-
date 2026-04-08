@@ -11,18 +11,75 @@ import logging
 from datetime import timedelta
 
 from celery import shared_task
-from celery.exceptions import Reject
 from django.utils import timezone
-from django.conf import settings
-from decouple import config
 
 from apps.integrations.linkedin.client import LinkedinClient
+from apps.notifications.models import NotificationConnection, NotificationDelivery
 from apps.notifications.telegram.client import TelegramClient
 
 from ..models import ScheduledPost, PostStatus
-from shared.celery_utils import IdempotentTaskMixin
 
 logger = logging.getLogger(__name__)
+
+
+def _get_active_telegram_connection(user_id):
+    return (
+        NotificationConnection.objects.filter(
+            user_id=user_id,
+            platform="telegram",
+            is_active=True,
+            is_verified=True,
+        )
+        .order_by("-is_primary", "-created_at")
+        .first()
+    )
+
+
+def _approval_message(post: ScheduledPost) -> str:
+    return (
+        "LinkedIn post awaiting automation review.\n\n"
+        f"{post.content}"
+    )
+
+
+def _send_telegram_approval(post: ScheduledPost) -> None:
+    connection = _get_active_telegram_connection(post.author_id)
+    if connection is None or not connection.destination:
+        raise ValueError("User does not have an active Telegram notification connection")
+
+    delivery = NotificationDelivery.objects.create(
+        user_id=post.author_id,
+        connection=connection,
+        platform="telegram",
+        notification_type="post_approval",
+        body=_approval_message(post),
+        payload={
+            "post_id": str(post.id),
+            "buttons": ["confirm", "stop"],
+        },
+        metadata={
+            "scheduled_post_id": str(post.id),
+        },
+    )
+
+    client = TelegramClient()
+
+    try:
+        response = client.send_message_sync(
+            chat_id=connection.destination,
+            text=_approval_message(post),
+            reply_markup=TelegramClient.build_automation_keyboard(str(post.id)),
+        )
+    except Exception as exc:
+        delivery.mark_failed(str(exc))
+        raise
+
+    message_id = str((response.get("result") or {}).get("message_id") or "")
+    delivery.mark_sent(message_id)
+
+    connection.last_interaction_at = timezone.now()
+    connection.last_inbound_event_id = connection.last_inbound_event_id or ""
+    connection.save(update_fields=["last_interaction_at", "updated_at"])
 
 
 @shared_task(
@@ -100,35 +157,20 @@ def send_for_approval(self, post_id: str) -> None:
         ScheduledPost.DoesNotExist: If post with given ID doesn't exist
     """
     try:
-        post = ScheduledPost.objects.get(id=post_id)
+        post = ScheduledPost.objects.select_related("author").get(id=post_id)
     except ScheduledPost.DoesNotExist:
         logger.error(f"Post with ID {post_id} not found")
         return
-    
-    # Get Telegram credentials from environment
-    telegram_token = config('TELEGRAM_BOT_TOKEN')
-    telegram_chat_id = config('TELEGRAM_APPROVAL_CHAT_ID')
-    
-    # Initialize Telegram client with environment credentials
-    telegram = TelegramClient(
-        bot_token=telegram_token,
-        chat_id=telegram_chat_id,
-    )
-    
+
     try:
-        # Send approval request (use synchronous method for Celery)
-        telegram.send_approval_sync(
-            f"Review LinkedIn Post:\n\n{post.content}",
-            str(post.id),
-        )
-        
-        # Update status
+        _send_telegram_approval(post)
         post.status = PostStatus.SENT_FOR_APPROVAL
-        post.save()
-        
+        post.error_log = ""
+        post.save(update_fields=["status", "error_log", "updated_at"])
         logger.info(f"Sent post {post_id} for approval")
-        
     except Exception as e:
+        post.error_log = f"{type(e).__name__}: {str(e)}"
+        post.save(update_fields=["error_log", "updated_at"])
         logger.error(f"Failed to send post {post_id} for approval: {e}")
         raise
 

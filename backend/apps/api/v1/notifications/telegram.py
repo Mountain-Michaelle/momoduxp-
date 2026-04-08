@@ -5,7 +5,6 @@ Owns both Telegram connection-link generation and outbound message delivery.
 """
 
 from datetime import datetime, timedelta
-import json
 import secrets
 
 import httpx
@@ -15,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.config import api_settings
 from apps.api.v1.auth.dependencies import get_current_active_user
+from apps.notifications.telegram.client import TelegramClient
 from shared.database import get_db
 from shared.models.notifications import (
     NotificationConnection,
@@ -46,10 +46,6 @@ def _require_telegram_bot_token() -> str:
     return token
 
 
-def _telegram_api_url(token: str, method: str) -> str:
-    return f"{api_settings.TELEGRAM_BASE_URL}/bot{token}/{method}"
-
-
 def _telegram_bot_username() -> str:
     return api_settings.TELEGRAM_BOT_USERNAME.lstrip("@").strip()
 
@@ -68,21 +64,28 @@ def _webhook_url() -> str:
     if not base_url.startswith("https://"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="telegram webhook",
+            detail="Telegram webhooks require an HTTPS PUBLIC_API_BASE_URL",
         )
     return f"{base_url}/api/v1/webhooks/telegram"
 
 
-async def _telegram_bot_call(token: str, method: str, payload: dict | None = None) -> dict:
+def _telegram_client() -> TelegramClient:
+    return TelegramClient(
+        bot_token=_require_telegram_bot_token(),
+        base_url=api_settings.TELEGRAM_BASE_URL,
+    )
+
+
+async def _telegram_api_request(method: str, payload: dict | None = None) -> dict:
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.post(
-                _telegram_api_url(token, method),
+                f"{api_settings.TELEGRAM_BASE_URL}/bot{_require_telegram_bot_token()}/{method}",
                 json=payload or {},
             )
             response.raise_for_status()
             return response.json()
-    except httpx.HTTPError as exc:
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Telegram API request failed: {exc}",
@@ -161,19 +164,6 @@ async def create_telegram_connect_link(
         detail="Telegram connect link generated successfully",
     )
 
-
-def _build_automation_keyboard(reference_id: str) -> str:
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {"text": "Confirm", "callback_data": f"automation:confirm:{reference_id}"},
-                {"text": "Stop", "callback_data": f"automation:stop:{reference_id}"},
-            ]
-        ]
-    }
-    return json.dumps(keyboard)
-
-
 @router.get("/health")
 async def health_check() -> dict[str, str]:
     return {"status": "healthy", "service": "telegram-notifications"}
@@ -181,9 +171,8 @@ async def health_check() -> dict[str, str]:
 
 @router.post("/set-webhook", response_model=TelegramWebhookConfigResponse)
 async def set_telegram_webhook() -> TelegramWebhookConfigResponse:
-    token = _require_telegram_bot_token()
     webhook_url = _webhook_url()
-    telegram_response = await _telegram_bot_call(token, "setWebhook", {"url": webhook_url})
+    telegram_response = await _telegram_api_request("setWebhook", {"url": webhook_url})
     return TelegramWebhookConfigResponse(
         ok=bool(telegram_response.get("ok")),
         webhook_url=webhook_url,
@@ -194,8 +183,7 @@ async def set_telegram_webhook() -> TelegramWebhookConfigResponse:
 
 @router.get("/webhook-info", response_model=TelegramWebhookConfigResponse)
 async def get_telegram_webhook_info() -> TelegramWebhookConfigResponse:
-    token = _require_telegram_bot_token()
-    telegram_response = await _telegram_bot_call(token, "getWebhookInfo")
+    telegram_response = await _telegram_api_request("getWebhookInfo")
     result = telegram_response.get("result", {}) if isinstance(telegram_response, dict) else {}
     return TelegramWebhookConfigResponse(
         ok=bool(telegram_response.get("ok")),
@@ -207,8 +195,7 @@ async def get_telegram_webhook_info() -> TelegramWebhookConfigResponse:
 
 @router.delete("/webhook", response_model=TelegramWebhookConfigResponse)
 async def delete_telegram_webhook() -> TelegramWebhookConfigResponse:
-    token = _require_telegram_bot_token()
-    telegram_response = await _telegram_bot_call(token, "deleteWebhook", {"drop_pending_updates": False})
+    telegram_response = await _telegram_api_request("deleteWebhook", {"drop_pending_updates": False})
     return TelegramWebhookConfigResponse(
         ok=bool(telegram_response.get("ok")),
         webhook_url=None,
@@ -223,7 +210,6 @@ async def send_telegram_notification(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> TelegramNotificationSendResponse:
-    token = _require_telegram_bot_token()
     connection = await _get_target_connection(db, current_user.id, request.connection_id)
 
     delivery = NotificationDelivery(
@@ -246,14 +232,10 @@ async def send_telegram_notification(
     await db.flush()
 
     try:
-        telegram_response_data = await _telegram_bot_call(
-            token,
-            "sendMessage",
-            {
-                "chat_id": connection.destination,
-                "text": request.message,
-                "reply_markup": _build_automation_keyboard(request.reference_id),
-            },
+        telegram_response_data = await _telegram_client().send_message(
+            chat_id=connection.destination,
+            text=request.message,
+            reply_markup=TelegramClient.build_automation_keyboard(request.reference_id),
         )
     except HTTPException as exc:
         delivery.status = "failed"

@@ -255,14 +255,9 @@ async def submit_for_approval(
             detail="Only draft or previously submitted posts can be submitted",
         )
 
-    post.status = PostStatusEnum.SENT_FOR_APPROVAL.value
-    post.updated_at = datetime.utcnow()
-
-    await db.commit()
-    await db.refresh(post)
-
     trigger_send_for_approval(str(post.id))
 
+    await db.refresh(post)
     return PostResponse.model_validate(post)
 
 

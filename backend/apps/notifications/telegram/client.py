@@ -1,69 +1,74 @@
-import httpx 
 import json
-from decouple import config 
+
+import httpx
+from decouple import config
 
 
 class TelegramClient:
+    """Small Telegram Bot API client shared by FastAPI routes and Django tasks."""
 
-    def __init__(self, bot_token:str, chat_id:str):
-        self.base_url = f"{config('TELEGRAM_BASE_URL')}/bot/{bot_token}"
-        self.chat_id = chat_id
+    def __init__(self, bot_token: str | None = None, base_url: str | None = None):
+        token = bot_token or config("TELEGRAM_BOT_TOKEN", default="")
+        if not token:
+            raise ValueError("TELEGRAM_BOT_TOKEN is not configured")
 
-    def send_approval_sync(self, text: str, post_id: str) -> None:
-        """
-        Synchronous method to send approval request.
-        Used by Celery tasks.
-        
-        Args:
-            text: The message text to send
-            post_id: The post ID for callback data
-        """
-        keyboard = {
-            "inline_keyboard":
-            [
-                [
-                    {"text":"Approve", "callback_data":f"approve:{post_id}"},
-                    {"text": "Reject", "callback_data":f"reject:{post_id}"}
+        api_base = (base_url or config("TELEGRAM_BASE_URL", default="https://api.telegram.org")).rstrip("/")
+        self.base_url = f"{api_base}/bot{token}"
+
+    @staticmethod
+    def build_automation_keyboard(reference_id: str) -> str:
+        return json.dumps(
+            {
+                "inline_keyboard": [
+                    [
+                        {"text": "Confirm", "callback_data": f"automation:confirm:{reference_id}"},
+                        {"text": "Stop", "callback_data": f"automation:stop:{reference_id}"},
+                    ]
                 ]
-            ]    
-        }
+            }
+        )
+
+    def send_message_sync(
+        self,
+        *,
+        chat_id: str,
+        text: str,
+        reply_markup: str | None = None,
+    ) -> dict:
+        payload = {"chat_id": chat_id, "text": text}
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
 
         with httpx.Client(timeout=10) as client:
-            client.post(
-                f"{self.base_url}/sendMessage",
-                json={
-                    "chat_id":self.chat_id,
-                    "text":text, 
-                    "reply_markup":json.dumps(keyboard),
-                }
-            )
+            response = client.post(f"{self.base_url}/sendMessage", json=payload)
+            response.raise_for_status()
+            return response.json()
 
-    async def send_approval(self, text:str, post_id:str):
-        """
-        Asynchronous method to send approval request.
-        Used by async views and services.
-        
-        Args:
-            text: The message text to send
-            post_id: The post ID for callback data
-        """
-        keyboard = {
-            "inline_keyboard":
-            [
-                [
-                    {"text":"Approve", "callback_data":f"approve:{post_id}"},
-                    {"text": "Reject", "callback_data":f"reject:{post_id}"}
-                ]
-            ]    
-        }
+    async def send_message(
+        self,
+        *,
+        chat_id: str,
+        text: str,
+        reply_markup: str | None = None,
+    ) -> dict:
+        payload = {"chat_id": chat_id, "text": text}
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
 
         async with httpx.AsyncClient(timeout=10) as client:
-            await client.post(
-                f"{self.base_url}/sendMessage",
-                json={
-                    "chat_id":self.chat_id,
-                    "text":text, 
-                    "reply_markup":json.dumps(keyboard),
-                }
-            )
+            response = await client.post(f"{self.base_url}/sendMessage", json=payload)
+            response.raise_for_status()
+            return response.json()
 
+    async def answer_callback_query(self, *, callback_query_id: str, text: str, show_alert: bool = False) -> dict:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(
+                f"{self.base_url}/answerCallbackQuery",
+                json={
+                    "callback_query_id": callback_query_id,
+                    "text": text,
+                    "show_alert": show_alert,
+                },
+            )
+            response.raise_for_status()
+            return response.json()
