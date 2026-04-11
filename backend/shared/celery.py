@@ -85,16 +85,17 @@ def create_celery_app() -> Celery:
 
         app.config_from_object("django.conf:settings", namespace="CELERY")
         app.autodiscover_tasks()
+        app.autodiscover_tasks(["apps.api.v1"])
 
         # Celery Beat schedule (Django ONLY)
         app.conf.beat_schedule = {
             "approval-deadline-watcher": {
-                "task": "apps.posts.tasks.approval_deadline_watcher",
+                "task": "apps.api.v1.tasks.post_task.approval_deadline_watcher",
                 "schedule": 60.0,
                 "options": {"queue": "default"},
             },
             "cleanup-failed-posts": {
-                "task": "apps.posts.tasks.cleanup_failed_posts",
+                "task": "apps.api.v1.tasks.post_task.cleanup_failed_posts",
                 "schedule": 3600.0,
                 "options": {"queue": "slow"},
             },
@@ -143,7 +144,7 @@ def create_celery_app() -> Celery:
         task_default_queue="default",
         task_routes={
             "apps.*.tasks.*": {"queue": "default"},
-            "apps.posts.tasks.cleanup_failed_posts": {"queue": "slow"},
+            "apps.api.v1.tasks.post_task.cleanup_failed_posts": {"queue": "slow"},
         },
     )
 

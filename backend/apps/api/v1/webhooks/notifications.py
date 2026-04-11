@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.config import api_settings
+from apps.api.v1.tasks.post_task import consume_telegram_action
 from shared.database import get_db
 from shared.models.notifications import (
     NotificationConnection,
@@ -397,6 +398,17 @@ async def receive_notification_webhook(
     if connection is not None:
         await db.refresh(connection)
 
+    detail = "Webhook processed successfully"
+    if platform == "telegram" and user is not None and action and action_reference:
+        action_detail = await consume_telegram_action(
+            db,
+            user_id=user.id,
+            action=action,
+            reference_id=action_reference,
+        )
+        if action_detail:
+            detail = action_detail
+
     if platform == "telegram" and context["metadata"].get("callback_query_id"):
         try:
             await _answer_telegram_callback(context["metadata"]["callback_query_id"], action)
@@ -414,5 +426,5 @@ async def receive_notification_webhook(
         linked_user_id=user.id if user is not None else None,
         action=action,
         action_reference=action_reference,
-        detail="Webhook processed successfully",
+        detail=detail,
     )

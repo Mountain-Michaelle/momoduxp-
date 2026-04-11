@@ -1,10 +1,12 @@
-import asyncio
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
+from apps.api.v1.tasks.post_task import (
+    trigger_approval_deadline_watcher,
+    trigger_send_for_approval,
+)
 from .models import ScheduledPost
-from .tasks.post_tasks import send_for_approval, approval_deadline_watcher
 
 @csrf_exempt 
 def schedule_post(request):
@@ -18,7 +20,7 @@ def schedule_post(request):
     )
     
     # Dispatch Celery tasks instead 
-    send_for_approval.delay(str(post.id))
-    approval_deadline_watcher.delay()
+    trigger_send_for_approval(str(post.id))
+    trigger_approval_deadline_watcher()
 
     return JsonResponse({"post_id": post.id})

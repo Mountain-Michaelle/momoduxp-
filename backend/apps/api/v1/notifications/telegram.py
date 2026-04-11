@@ -66,7 +66,7 @@ def _webhook_url() -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Telegram webhooks require an HTTPS PUBLIC_API_BASE_URL",
         )
-    return f"{base_url}/api/v1/webhooks/telegram"
+    return f"{base_url}/api/v1/webhooks/telegram/webhook"
 
 
 def _telegram_client() -> TelegramClient:

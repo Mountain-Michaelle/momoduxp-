@@ -23,7 +23,10 @@ from shared.schemas.posts import (
 from shared.models.users import User
 from shared.models.posts import ScheduledPost
 from apps.api.v1.auth.dependencies import get_current_active_user
-from apps.api.v1.tasks.post_task import trigger_publish_post, trigger_send_for_approval
+from apps.api.v1.tasks.post_task import (
+    approve_post_record,
+    trigger_send_for_approval,
+)
 
 
 router = APIRouter(prefix="/posts", tags=["posts"])
@@ -290,15 +293,5 @@ async def approve_post(
             detail="Only posts sent for approval can be approved",
         )
 
-    now = datetime.utcnow()
-
-    post.status = PostStatusEnum.APPROVED.value
-    post.approved_at = now
-    post.updated_at = now
-
-    await db.commit()
-    await db.refresh(post)
-
-    trigger_publish_post(str(post.id))
-
+    post = await approve_post_record(db, post, trigger_publish=True)
     return PostResponse.model_validate(post)
