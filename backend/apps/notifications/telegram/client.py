@@ -1,7 +1,10 @@
 import json
+import logging
 
 import httpx
 from decouple import config
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramClient:
@@ -39,8 +42,19 @@ class TelegramClient:
         if reply_markup:
             payload["reply_markup"] = reply_markup
 
+        logger.info(
+            "Telegram send_message_sync request chat_id=%s text_length=%s has_reply_markup=%s",
+            chat_id,
+            len(text),
+            bool(reply_markup),
+        )
         with httpx.Client(timeout=10) as client:
             response = client.post(f"{self.base_url}/sendMessage", json=payload)
+            logger.info(
+                "Telegram send_message_sync response status=%s body=%s",
+                response.status_code,
+                response.text,
+            )
             response.raise_for_status()
             return response.json()
 
@@ -55,8 +69,19 @@ class TelegramClient:
         if reply_markup:
             payload["reply_markup"] = reply_markup
 
+        logger.info(
+            "Telegram send_message request chat_id=%s text_length=%s has_reply_markup=%s",
+            chat_id,
+            len(text),
+            bool(reply_markup),
+        )
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.post(f"{self.base_url}/sendMessage", json=payload)
+            logger.info(
+                "Telegram send_message response status=%s body=%s",
+                response.status_code,
+                response.text,
+            )
             response.raise_for_status()
             return response.json()
 

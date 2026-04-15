@@ -41,7 +41,7 @@ django_asgi_app = get_asgi_application()
 # Import here to avoid circular imports and ensure Django is setup
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from api.main import app as fastapi_app
+from apps.api.main import app as fastapi_app
 
 
 # Configure FastAPI for mounting

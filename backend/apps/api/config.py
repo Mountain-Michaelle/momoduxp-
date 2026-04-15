@@ -12,15 +12,13 @@ class APISettings(BaseSettings):
     """FastAPI application settings."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
     # Application settings
     APP_NAME: str = "Momodu API"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = False
+    API_DEBUG: bool = False
 
     # CORS settings
     CORS_ORIGINS: List[str] = [
@@ -35,10 +33,27 @@ class APISettings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    
+
     # JWT settings
     JWT_ISSUER: str = "momodu-api"
     JWT_AUDIENCE: str = "momodu-api"
+
+    # Google Basic OAuth #
+        # Google OAuth settings
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8001/api/v1/auth/oauth/google/callback"
+    
+    # OAuth scopes
+    GOOGLE_SCOPES: List[str] = [
+        "openid",
+        "email",
+        "profile",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+    ]
+    #_____________________________________________________
+
 
     # Encryption key for tokens (generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key())")
     ENCRYPTION_KEY: str = "change-this-in-production"
@@ -69,6 +84,22 @@ class APISettings(BaseSettings):
         if isinstance(self.CORS_ORIGINS, str):
             return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
         return self.CORS_ORIGINS
+
+# __________________________________ 
+# Oauth Properties
+    @property
+    def google_oauth_config(self) -> dict:
+        """Google OAuth configuration dict for authlib."""
+        return {
+            "client_id": self.GOOGLE_CLIENT_ID,
+            "client_secret": self.GOOGLE_CLIENT_SECRET,
+            "redirect_uri": self.GOOGLE_REDIRECT_URI,
+            "scope": self.GOOGLE_SCOPES,
+            "issuer": "https://accounts.google.com",
+            "access_token_url": "https://oauth2.googleapis.com/token",
+            "userinfo_url": "https://www.googleapis.com/oauth2/v3/userinfo",
+            "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        }
 
 
 # Global settings instance

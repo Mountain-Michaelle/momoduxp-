@@ -33,7 +33,9 @@ from shared.schemas.notifications import (
 router = APIRouter(prefix="/webhooks", tags=["notification-webhooks"])
 
 
-def _parse_telegram_action(callback_query: dict[str, Any]) -> tuple[str | None, str | None]:
+def _parse_telegram_action(
+    callback_query: dict[str, Any],
+) -> tuple[str | None, str | None]:
     callback_data = (callback_query.get("data") or "").strip()
     if not callback_data:
         return None, None
@@ -101,7 +103,9 @@ def _extract_telegram_context(payload: dict[str, Any]) -> dict[str, Any]:
         "external_event_id": str(update_id or ""),
         "destination": str(chat.get("id", "") or ""),
         "external_user_id": str(sender.get("id", "") or ""),
-        "display_name": " ".join(filter(None, [sender.get("first_name"), sender.get("last_name")])).strip(),
+        "display_name": " ".join(
+            filter(None, [sender.get("first_name"), sender.get("last_name")])
+        ).strip(),
         "metadata": {
             "telegram_username": sender.get("username", "") or "",
             "chat_type": chat.get("type", "private"),
@@ -121,10 +125,24 @@ def _extract_generic_context(platform: str, payload: dict[str, Any]) -> dict[str
     if platform == "telegram":
         return _extract_telegram_context(payload)
 
-    external_event_id = payload.get("id") or payload.get("event_id") or payload.get("message_id") or ""
-    destination = payload.get("destination") or payload.get("to") or payload.get("channel") or ""
-    external_user_id = payload.get("user_id") or payload.get("external_user_id") or payload.get("from") or ""
-    event_type = payload.get("event_type") or payload.get("event") or payload.get("type") or "unknown"
+    external_event_id = (
+        payload.get("id") or payload.get("event_id") or payload.get("message_id") or ""
+    )
+    destination = (
+        payload.get("destination") or payload.get("to") or payload.get("channel") or ""
+    )
+    external_user_id = (
+        payload.get("user_id")
+        or payload.get("external_user_id")
+        or payload.get("from")
+        or ""
+    )
+    event_type = (
+        payload.get("event_type")
+        or payload.get("event")
+        or payload.get("type")
+        or "unknown"
+    )
 
     return {
         "event_type": str(event_type),
@@ -194,10 +212,16 @@ async def _find_user(
     db: AsyncSession,
     platform: str,
     context: dict[str, Any],
-) -> tuple[User | None, NotificationConnection | None, NotificationConnectionRequest | None]:
-    connection_request = await _find_connection_request(db, platform, context.get("connect_reference_id"))
+) -> tuple[
+    User | None, NotificationConnection | None, NotificationConnectionRequest | None
+]:
+    connection_request = await _find_connection_request(
+        db, platform, context.get("connect_reference_id")
+    )
     if connection_request is not None:
-        result = await db.execute(select(User).where(User.id == connection_request.user_id))
+        result = await db.execute(
+            select(User).where(User.id == connection_request.user_id)
+        )
         return result.scalar_one_or_none(), None, connection_request
 
     connection = await _find_existing_connection(
@@ -223,7 +247,6 @@ async def _has_primary_connection(db: AsyncSession, user_id) -> bool:
     )
     return result.first() is not None
 
-
 async def _upsert_connection(
     db: AsyncSession,
     platform: str,
@@ -248,7 +271,9 @@ async def _upsert_connection(
             user_id=user.id,
             platform=platform,
             destination_type="chat" if platform == "telegram" else "custom",
-            destination=context["destination"] or context["external_user_id"] or f"{platform}:{user.id}",
+            destination=context["destination"]
+            or context["external_user_id"]
+            or f"{platform}:{user.id}",
             created_at=now,
             updated_at=now,
             is_primary=not await _has_primary_connection(db, user.id),
@@ -262,8 +287,13 @@ async def _upsert_connection(
     if context["external_user_id"]:
         connection.external_user_id = context["external_user_id"]
     connection.display_name = context["display_name"] or connection.display_name
-    connection.metadata_json = {**(connection.metadata_json or {}), **context["metadata"]}
-    connection.external_channel_id = context["destination"] or connection.external_channel_id
+    connection.metadata_json = {
+        **(connection.metadata_json or {}),
+        **context["metadata"],
+    }
+    connection.external_channel_id = (
+        context["destination"] or connection.external_channel_id
+    )
     connection.is_verified = bool(context["is_verified"] or connection.is_verified)
     connection.connected_at = connection.connected_at or now
     connection.last_interaction_at = now
@@ -326,11 +356,14 @@ async def receive_notification_webhook(
             ),
             linked_user_id=existing_event.user_id,
             action=existing_event.metadata_json.get("action") or None,
-            action_reference=existing_event.metadata_json.get("action_reference") or None,
+            action_reference=existing_event.metadata_json.get("action_reference")
+            or None,
             detail="Duplicate webhook event ignored",
         )
 
-    user, existing_connection, connection_request = await _find_user(db, platform, context)
+    user, existing_connection, connection_request = await _find_user(
+        db, platform, context
+    )
     event = NotificationWebhookEvent(
         platform=platform,
         event_type=context["event_type"],
@@ -349,7 +382,9 @@ async def receive_notification_webhook(
 
     try:
         if user is not None:
-            connection = await _upsert_connection(db, platform, user, context, existing_connection)
+            connection = await _upsert_connection(
+                db, platform, user, context, existing_connection
+            )
             event.user_id = user.id
             event.connection_id = connection.id
             if connection_request is not None:
@@ -400,18 +435,26 @@ async def receive_notification_webhook(
 
     detail = "Webhook processed successfully"
     if platform == "telegram" and user is not None and action and action_reference:
-        action_detail = await consume_telegram_action(
-            db,
-            user_id=user.id,
-            action=action,
-            reference_id=action_reference,
-        )
-        if action_detail:
-            detail = action_detail
+        from shared.database import get_sync_session
+
+        try:
+            with get_sync_session() as sync_db:
+                action_detail = consume_telegram_action(
+                    sync_db,
+                    user_id=user.id,
+                    action=action,
+                    reference_id=action_reference,
+                )
+                if action_detail:
+                    detail = action_detail
+        except Exception as action_exc:
+            detail = f"Action failed: {action_exc}"
 
     if platform == "telegram" and context["metadata"].get("callback_query_id"):
         try:
-            await _answer_telegram_callback(context["metadata"]["callback_query_id"], action)
+            await _answer_telegram_callback(
+                context["metadata"]["callback_query_id"], action
+            )
         except httpx.HTTPError:
             pass
 

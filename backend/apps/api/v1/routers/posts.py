@@ -6,6 +6,7 @@ Handles CRUD operations for scheduled posts and Celery task integration.
 from typing import Optional
 from datetime import datetime
 import uuid
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,17 +25,19 @@ from shared.models.users import User
 from shared.models.posts import ScheduledPost
 from apps.api.v1.auth.dependencies import get_current_active_user
 from apps.api.v1.tasks.post_task import (
-    approve_post_record,
+    approve_post_record_async,
     trigger_send_for_approval,
 )
 
 
 router = APIRouter(prefix="/posts", tags=["posts"])
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------
 # Health Check
 # ---------------------------------------------------
+
 
 @router.get("/health")
 async def health_check():
@@ -90,6 +93,7 @@ async def list_posts(
 # Get Single Post
 # ---------------------------------------------------
 
+
 @router.get("/{post_id}", response_model=PostResponse)
 async def get_post(
     post_id: uuid.UUID,
@@ -116,7 +120,10 @@ async def get_post(
 # Create Post
 # ---------------------------------------------------
 
-@router.post("/create", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/create", response_model=PostResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_post(
     post_data: PostCreate,
     db: AsyncSession = Depends(get_db),
@@ -145,16 +152,12 @@ async def create_post(
     await db.commit()
     await db.refresh(post)
 
-    if post.approval_deadline:
-        trigger_send_for_approval(str(post.id))
-
     return PostResponse.model_validate(post)
 
 
 # ---------------------------------------------------
 # Update Post
 # ---------------------------------------------------
-
 @router.patch("/update/{post_id}", response_model=PostResponse)
 async def update_post(
     post_id: uuid.UUID,
@@ -201,6 +204,7 @@ async def update_post(
 # ---------------------------------------------------
 # Delete Post (Soft Delete)
 # ---------------------------------------------------
+
 
 @router.delete("/delete/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_post(
@@ -258,15 +262,38 @@ async def submit_for_approval(
             detail="Only draft or previously submitted posts can be submitted",
         )
 
-    trigger_send_for_approval(str(post.id))
+    import traceback
+    import time
 
-    await db.refresh(post)
+    start = time.time()
+
+    try:
+        logger.info("About to call trigger_send_for_approval for post_id=%s", post.id)
+        trigger_send_for_approval(str(post.id))
+        elapsed = time.time() - start
+        logger.info(
+            "Successfully called trigger_send_for_approval for post_id=%s elapsed=%.3fs",
+            post.id,
+            elapsed,
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to trigger send_for_approval: %s\n%s", e, traceback.format_exc()
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+    logger.info(
+        "submit_for_approval queued post_id=%s status_after_queue=%s",
+        post.id,
+        post.status,
+    )
     return PostResponse.model_validate(post)
 
 
 # ---------------------------------------------------
 # Approve Post
 # ---------------------------------------------------
+
 
 @router.post("/{post_id}/approve", response_model=PostResponse)
 async def approve_post(
@@ -293,5 +320,5 @@ async def approve_post(
             detail="Only posts sent for approval can be approved",
         )
 
-    post = await approve_post_record(db, post, trigger_publish=True)
+    post = await approve_post_record_async(db, post, trigger_publish=True)
     return PostResponse.model_validate(post)

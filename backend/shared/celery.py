@@ -1,15 +1,10 @@
-"""
-Shared Celery configuration (Django + FastAPI safe)
-
-Design goals:
-- Safe lazy initialization
-- Django loaded only when required
-- Worker-safe (no duplicate setup)
-- Production-grade defaults
-- Predictable behavior in multi-worker environments
-"""
+# shared/celery.py
 
 import os
+# if os.environ.get("CELERY_WORKER_RUNNING"):
+#     from gevent import monkey
+#     monkey.patch_all()
+
 import logging
 from pathlib import Path
 from celery import Celery
@@ -19,11 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------------------
-# Environment loading (safe, idempotent)
+# ENV LOADER
 # ------------------------------------------------------------------------------
 
+
 def load_dotenv_once() -> None:
-    """Load .env once, safely."""
     if os.getenv("DOTENV_LOADED") == "1":
         return
 
@@ -32,6 +27,7 @@ def load_dotenv_once() -> None:
 
     try:
         from dotenv import load_dotenv
+
         if env_path.exists():
             load_dotenv(env_path)
             logger.info("Loaded .env from %s", env_path)
@@ -50,44 +46,60 @@ load_dotenv_once()
 
 
 # ------------------------------------------------------------------------------
-# Django helpers
+# DJANGO SETUP
 # ------------------------------------------------------------------------------
+
 
 def django_enabled() -> bool:
     return bool(os.getenv("DJANGO_SETTINGS_MODULE"))
 
 
 def setup_django_once() -> None:
-    """Ensure django.setup() is called exactly once."""
     if os.getenv("DJANGO_SETUP_DONE") == "1":
         return
 
     import django
+
     django.setup()
+
+    # FIX: Import all SQLAlchemy models to ensure relationships are resolved
+    # before any task tries to use them. Without this, the "User" relationship
+    # in NotificationConnection fails to resolve because User model isn't loaded.
+    from shared.models import users  # noqa
+    from shared.models import notifications  # noqa
+    from shared.models import posts  # noqa
+
     os.environ["DJANGO_SETUP_DONE"] = "1"
     logger.info("Django initialized for Celery")
 
 
 # ------------------------------------------------------------------------------
-# Celery factory
+# CELERY FACTORY
 # ------------------------------------------------------------------------------
+
 
 def create_celery_app() -> Celery:
     app = Celery("momodu")
 
-    # ---------------------------
-    # Django-backed workers
-    # ---------------------------
+    app.set_default()
+
+    # IMPORTANT: Django must be setup BEFORE autodiscover to ensure models are loaded
     if django_enabled():
         setup_django_once()
 
+    # Now discover tasks - models are ready
+    app.autodiscover_tasks(
+        [
+            "apps.api.v1.tasks.post_task",
+            "apps.webhooks.tasks",
+        ]
+    )
+
+    if django_enabled():
         from django.conf import settings
 
         app.config_from_object("django.conf:settings", namespace="CELERY")
-        app.autodiscover_tasks()
-        app.autodiscover_tasks(["apps.api.v1"])
 
-        # Celery Beat schedule (Django ONLY)
         app.conf.beat_schedule = {
             "approval-deadline-watcher": {
                 "task": "apps.api.v1.tasks.post_task.approval_deadline_watcher",
@@ -106,12 +118,9 @@ def create_celery_app() -> Celery:
             },
         }
 
-    # ---------------------------
-    # FastAPI / standalone workers
-    # ---------------------------
     else:
-        broker = os.getenv("CELERY_BROKER_URL")
-        backend = os.getenv("CELERY_RESULT_BACKEND")
+        broker = os.getenv("CELERY_BROKER_URL", os.getenv("REDIS_URL"))
+        backend = os.getenv("CELERY_RESULT_BACKEND", os.getenv("REDIS_URL"))
 
         if not broker:
             raise RuntimeError("CELERY_BROKER_URL must be set")
@@ -119,50 +128,48 @@ def create_celery_app() -> Celery:
         app.conf.broker_url = broker
         app.conf.result_backend = backend
 
-    # ---------------------------
-    # Global production defaults
-    # ---------------------------
+    # Ensure broker_url is always set (for both Django and non-Django modes)
+    if not app.conf.broker_url:
+        app.conf.broker_url = (
+            os.getenv("CELERY_BROKER_URL")
+            or os.getenv("REDIS_URL")
+            or "redis://localhost:6379/0"
+        )
+
+    # GLOBAL CONFIG
     app.conf.update(
-        # Time
         timezone="UTC",
         enable_utc=True,
-
-        # Concurrency & performance
         worker_prefetch_multiplier=1,
         task_acks_late=True,
         worker_max_tasks_per_child=500,
-
-        # Reliability
+        broker_pool_limit=10,
+        broker_transport_options={
+            "visibility_timeout": 3600,
+            "socket_keepalive": True,
+            "retry_on_timeout": True,
+            "max_retries": 3,
+        },
         broker_connection_retry_on_startup=True,
         task_reject_on_worker_lost=True,
-
-        # Time limits
+        task_track_started=True,
         task_soft_time_limit=270,
         task_time_limit=300,
-
-        # Routing
         task_default_queue="default",
-        task_routes={
-            "apps.*.tasks.*": {"queue": "default"},
-            "apps.api.v1.tasks.post_task.cleanup_failed_posts": {"queue": "slow"},
-        },
     )
 
     logger.info("Celery app initialized (django=%s)", django_enabled())
     return app
 
 
-# ------------------------------------------------------------------------------
-# Singleton access (worker-safe)
-# ------------------------------------------------------------------------------
-
-_celery_app: Celery | None = None
+_celery_app = None
 
 
-def get_celery_app() -> Celery:
+def get_celery_app():
     global _celery_app
     if _celery_app is None:
         _celery_app = create_celery_app()
     return _celery_app
+
 
 celery_app = get_celery_app()

@@ -110,6 +110,46 @@ FastAPI-only worker (no Django):
 DJANGO_REQUIRED=false celery -A shared worker -l info
 ```
 
+#### Optimized Worker Commands (Production - Gevent Pool)
+
+For high-concurrency I/O-bound tasks, use gevent pool:
+
+```bash
+# I/O-heavy workers (Telegram, notifications, webhooks) - 300 concurrent
+celery -A shared.celery worker \
+  -P gevent \
+  --concurrency=300 \
+  -Q fast \
+  --loglevel=info \
+  --max-tasks-per-child=1000 \
+  -n worker.fast@%h
+
+# Default workers (publish, DB operations) - 50 concurrent
+celery -A shared.celery worker \
+  -P gevent \
+  --concurrency=50 \
+  -Q default \
+  --loglevel=info \
+  --max-tasks-per-child=500 \
+  -n worker.default@%h
+
+# Periodic/cleanup workers (CPU-bound) - use prefork
+celery -A shared.celery worker \
+  -P prefork \
+  --concurrency=4 \
+  -Q slow,celery \
+  --loglevel=info \
+  -n worker.periodic@%h
+
+# Beat scheduler
+celery -A shared.celery beat -l info
+```
+
+**Queue Types:**
+- `fast` - I/O-bound tasks (Telegram API, notifications, webhooks)
+- `default` - DB write operations (publish, status updates)
+- `slow` - Periodic tasks (cleanup, watchers, quota resets)
+
 ---
 
 ## API Endpoints

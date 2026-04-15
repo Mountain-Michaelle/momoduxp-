@@ -46,15 +46,22 @@ logger = logging.getLogger("run_api")
 # Main
 # ------------------------------------------------------------------------------
 
+
 def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Run FastAPI server")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8001)
-    parser.add_argument("--reload", action="store_true", help="Enable auto-reload (dev only)")
-    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes")
-    parser.add_argument("--log-level", default="info", choices=["debug", "info", "warning", "error"])
+    parser.add_argument(
+        "--reload", action="store_true", help="Enable auto-reload (dev only)"
+    )
+    parser.add_argument(
+        "--workers", type=int, default=1, help="Number of worker processes"
+    )
+    parser.add_argument(
+        "--log-level", default="info", choices=["debug", "info", "warning", "error"]
+    )
     parser.add_argument("--access-log", action="store_true", help="Enable access log")
 
     args = parser.parse_args()
@@ -87,6 +94,11 @@ def main() -> None:
     # ------------------------------------------------------------------------------
     # Uvicorn configuration
     # ------------------------------------------------------------------------------
+
+    logger.info("=" * 40)
+    logger.info(f"Server running at http://{args.host}:{args.port}")
+    logger.info(f"API Docs: http://{args.host}:{args.port}/api/docs")
+    logger.info("=" * 40)
 
     config = uvicorn.Config(
         app="apps.api.main:app",
