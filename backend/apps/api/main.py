@@ -13,6 +13,8 @@ import logging
 from apps.api.config import api_settings
 from apps.api.v1.notifications import telegram as telegram_notifications
 from apps.api.v1.routers import posts, auth, ai
+from apps.api.v1.routers import oauth  # Add this line
+
 from apps.api.v1.webhooks import notifications as notification_webhooks
 from shared.database import init_db, close_db
 
@@ -128,12 +130,26 @@ async def detailed_health_check():
     }
 
 
-# Include routers
+# Include routers 
+
+# OAuth Routes
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(posts.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
+app.include_router(oauth.router, prefix="/api/v1") 
+
+#notifications/webhooks
 app.include_router(telegram_notifications.router, prefix="/api/v1")
 app.include_router(notification_webhooks.router, prefix="/api/v1")
+app.include_router(telegram_notifications.router, prefix="/api/v1")
+app.include_router(notification_webhooks.router, prefix="/api/v1")
+
+# Basic Auth
+app.include_router(auth.router, prefix="/api/v1")
+
+#Posts and Scheduling
+app.include_router(posts.router, prefix="/api/v1")
+app.include_router(ai.router, prefix="/api/v1")
 
 
 # Root endpoint

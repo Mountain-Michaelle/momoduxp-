@@ -16,9 +16,7 @@ class User(AbstractUser, BaseModel):
 
     email = models.EmailField(unique=True)
     subscription_plan = models.CharField(
-        max_length=20,
-        choices=SubscriptionPlan.choices,
-        default=SubscriptionPlan.FREE
+        max_length=20, choices=SubscriptionPlan.choices, default=SubscriptionPlan.FREE
     )
     subscription_expires_at = models.DateTimeField(null=True, blank=True)
 
@@ -42,19 +40,13 @@ class SocialPlatformAccount(BaseModel):
     ]
 
     user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="social_accounts"
+        User, on_delete=models.CASCADE, related_name="social_accounts"
     )
     platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
     platform_user_id = models.CharField(max_length=255)
-    access_token_encrypted = models.TextField(
-        help_text="Encrypted access token"
-    )
+    access_token_encrypted = models.TextField(help_text="Encrypted access token")
     refresh_token_encrypted = models.TextField(
-        null=True,
-        blank=True,
-        help_text="Encrypted refresh token"
+        null=True, blank=True, help_text="Encrypted refresh token"
     )
     expires_at = models.DateTimeField(null=True, blank=True)
 
@@ -65,21 +57,25 @@ class SocialPlatformAccount(BaseModel):
     def set_access_token(self, raw_token: str) -> None:
         """Encrypt and set access token."""
         from shared.utils import encrypt_token
+
         self.access_token_encrypted = encrypt_token(raw_token)
 
     def get_access_token(self) -> str:
         """Decrypt and get access token."""
         from shared.utils import decrypt_token
+
         return decrypt_token(self.access_token_encrypted)
 
     def set_refresh_token(self, raw_token: str) -> None:
         """Encrypt and set refresh token."""
         from shared.utils import encrypt_token
+
         self.refresh_token_encrypted = encrypt_token(raw_token)
 
     def get_refresh_token(self) -> str:
         """Decrypt and get refresh token."""
         from shared.utils import decrypt_token
+
         return decrypt_token(self.refresh_token_encrypted)
 
     def is_token_expired(self) -> bool:
@@ -93,9 +89,7 @@ class UsageQuota(BaseModel):
     """Usage quotas for subscription plans."""
 
     user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        related_name="usage_quota"
+        User, on_delete=models.CASCADE, related_name="usage_quota"
     )
     posts_this_month = models.IntegerField(default=0)
     ai_generations_this_month = models.IntegerField(default=0)
@@ -143,3 +137,45 @@ class UsageQuota(BaseModel):
         self.ai_generations_this_month = 0
         self.webhooks_triggered_this_month = 0
         self.save()
+
+
+class OAuthAccount(BaseModel):
+    """
+    OAuth provider account linking.
+    Links users to external OAuth providers (Google, GitHub, etc.)
+    """
+
+    PROVIDER_CHOICES = [
+        ("google", "Google"),
+        ("github", "GitHub"),
+        ("facebook", "Facebook"),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="oauth_accounts"
+    )
+    provider = models.CharField(max_length=50, choices=PROVIDER_CHOICES)
+    provider_user_id = models.CharField(max_length=255)
+    access_token = models.TextField(default="")
+    refresh_token = models.TextField(null=True, blank=True)
+    id_token = models.TextField(null=True, blank=True)
+    token_expires_at = models.DateTimeField(null=True, blank=True)
+    scope = models.CharField(max_length=500, default="")
+    extra_data = models.TextField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("provider", "provider_user_id")
+        indexes = [
+            models.Index(fields=["user", "provider"]),
+            models.Index(fields=["user", "provider", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.provider}:{self.user.email}"
+
+    @property
+    def is_token_expired(self) -> bool:
+        """Check if access token is expired."""
+        if not self.token_expires_at:
+            return False
+        return self.token_expires_at <= timezone.now()
