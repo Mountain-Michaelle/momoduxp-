@@ -26,11 +26,14 @@ class PostStatus(str, enum.Enum):
     """Post status enumeration matching Django."""
 
     DRAFT = "draft"
+    SCHEDULED = "scheduled"
     SENT_FOR_APPROVAL = "sent_for_approval"
     APPROVED = "approved"
+    QUEUED = "queued"
     PUBLISHING = "publishing"
     PUBLISHED = "published"
     FAILED = "failed"
+    STOPPED = "stopped"
 
 
 # ==============================================================================

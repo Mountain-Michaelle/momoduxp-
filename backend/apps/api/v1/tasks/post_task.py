@@ -128,6 +128,7 @@ def _build_automation_keyboard(reference_id: str) -> dict:
                     "text": "Confirm",
                     "callback_data": f"automation:confirm:{reference_id}",
                 },
+                {"text": "Pause", "callback_data": f"automation:pause:{reference_id}"},
                 {"text": "Stop", "callback_data": f"automation:stop:{reference_id}"},
             ]
         ]
@@ -199,7 +200,11 @@ def return_post_to_draft(
 def consume_telegram_action(
     db, *, user_id, action: str | None, reference_id: str | None
 ) -> str | None:
-    if action not in {"confirm", "stop"} or not reference_id or user_id is None:
+    if (
+        action not in {"confirm", "stop", "pause"}
+        or not reference_id
+        or user_id is None
+    ):
         return None
 
     try:
@@ -227,6 +232,17 @@ def consume_telegram_action(
         approve_post_record(db, post, trigger_publish=True)
         return "Telegram approval consumed successfully"
 
+    if action == "pause":
+        if post.status not in {
+            PostStatus.SCHEDULED.value,
+            PostStatus.QUEUED.value,
+        }:
+            return "Telegram pause ignored: post is not in scheduled or queued state"
+        post.status = PostStatus.DRAFT.value
+        post.updated_at = _utcnow()
+        db.commit()
+        return "Telegram pause consumed successfully"
+
     if post.status == PostStatus.PUBLISHED.value:
         return "Telegram stop ignored: post already published"
 
@@ -234,10 +250,14 @@ def consume_telegram_action(
         PostStatus.SENT_FOR_APPROVAL.value,
         PostStatus.APPROVED.value,
         PostStatus.DRAFT.value,
+        PostStatus.SCHEDULED.value,
+        PostStatus.QUEUED.value,
     }:
         return "Telegram stop ignored: post is not in an interruptible state"
 
-    return_post_to_draft(db, post, error_log="")
+    post.status = PostStatus.STOPPED.value
+    post.updated_at = _utcnow()
+    db.commit()
     return "Telegram stop consumed successfully"
 
 

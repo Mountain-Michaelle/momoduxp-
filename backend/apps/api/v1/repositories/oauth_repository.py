@@ -33,10 +33,10 @@ class OAuthProvider(str):
 # ─────────────────────────────────────────────────────────────
 
 
-class OAuthProvider(str):
-    GOOGLE = "google"
-    GITHUB = "github"
-    FACEBOOK = "facebook"
+# class OAuthProvider(str):
+#     GOOGLE = "google"
+#     GITHUB = "github"
+#     FACEBOOK = "facebook"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -44,37 +44,37 @@ class OAuthProvider(str):
 # ─────────────────────────────────────────────────────────────
 
 
-class OAuthAccount:
-    """
-    Represents a user's OAuth-linked account.
-    Stores provider info, tokens, and user association.
-    """
+# class OAuthAccount:
+#     """
+#     Represents a user's OAuth-linked account.
+#     Stores provider info, tokens, and user association.
+#     """
 
-    def __init__(
-        self,
-        id: uuid.UUID,
-        user_id: uuid.UUID,
-        provider: str,
-        provider_user_id: str,
-        access_token: str,
-        refresh_token: Optional[str],
-        id_token: Optional[str],
-        token_expires_at: Optional[datetime],
-        scope: str,
-        created_at: datetime,
-        updated_at: datetime,
-    ):
-        self.id = id
-        self.user_id = user_id
-        self.provider = provider
-        self.provider_user_id = provider_user_id
-        self.access_token = access_token
-        self.refresh_token = refresh_token
-        self.id_token = id_token
-        self.token_expires_at = token_expires_at
-        self.scope = scope
-        self.created_at = created_at
-        self.updated_at = updated_at
+#     def __init__(
+#         self,
+#         id: uuid.UUID,
+#         user_id: uuid.UUID,
+#         provider: str,
+#         provider_user_id: str,
+#         access_token: str,
+#         refresh_token: Optional[str],
+#         id_token: Optional[str],
+#         token_expires_at: Optional[datetime],
+#         scope: str,
+#         created_at: datetime,
+#         updated_at: datetime,
+#     ):
+#         self.id = id
+#         self.user_id = user_id
+#         self.provider = provider
+#         self.provider_user_id = provider_user_id
+#         self.access_token = access_token
+#         self.refresh_token = refresh_token
+#         self.id_token = id_token
+#         self.token_expires_at = token_expires_at
+#         self.scope = scope
+#         self.created_at = created_at
+#         self.updated_at = updated_at
 
 
 # ─────────────────────────────────────────────────────────────

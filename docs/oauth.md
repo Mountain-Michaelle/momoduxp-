@@ -2,495 +2,477 @@
 
 ## Overview
 
-This document describes the Google OAuth 2.0 authentication system implemented with authlib. The system provides secure OAuth login with token refresh capabilities.
+This document describes the Google OAuth login flow currently implemented in the backend.
 
-## Architecture
+The current design is backend-led:
 
-### Why authlib?
+- the frontend asks the backend for a Google authorization URL
+- the backend generates the URL from server-side configuration
+- Google redirects back to the backend callback
+- the backend exchanges the code, resolves the user, stores the OAuth link, and returns API JWTs
 
-We chose **authlib** over other OAuth libraries because:
+This keeps Google client credentials, redirect URI configuration, token exchange, and account-linking logic on the server.
+---
 
-1. **Production-ready**: Built by the same author as requests, battle-tested
-2. **RFC 8414 compliant**: Implements OAuth 2.0 Authorization Server Metadata
-3. **Token rotation**: Built-in support for refresh tokens
-4. **Multiple clients**: Can manage multiple OAuth providers easily
-5. **Active maintenance**: Well-maintained, security updates
+## Current Behavior
+The working Google OAuth flow now does the following:
 
-Alternative options considered:
-- `requests-oauthlib`: Less maintained, simpler API
-- `google-auth`: Google-specific, not provider-agnostic
-- `FastAPI-Social-Auth`: Too limited, not production-ready
+- uses the redirect URI configured in `backend/.env`
+- URL-encodes scopes correctly before redirecting to Google
+- requests `openid`, `email`, `profile`, `userinfo.email`, and `userinfo.profile`
+- accepts the Google callback on the backend
+- resolves identity from Google `userinfo` first
+- fills missing claims from the `id_token`
+- uses Google `tokeninfo` as a last fallback when email claims are incomplete
+- links to an existing local user by email when possible
+- creates a new local user when needed
+- stores the Google OAuth account link in the database
+- returns Momodu JWT access and refresh tokens to the caller
 
-### Directory Structure
+## Why This Design
 
-```
-backend/apps/api/v1/
-├── auth/
-│   ├── oauth.py                      # authlib client configuration
-│   ├── oauth_service.py               # Business logic layer
-│   └── deps/
-│       └── oauth_dependencies.py      # FastAPI dependencies
-├── repositories/
-│   └── oauth_repository.py            # Data access layer
-└── routers/
-    └── oauth.py                       # API endpoints
-```
+### Why the backend generates the Google URL
 
-### Why this Architecture?
+- It prevents drift between frontend and backend redirect URIs.
+- It prevents the frontend from constructing a broken scope string.
+- It centralizes OAuth parameters like `prompt=consent` and `access_type=offline`.
+- It keeps the server in control of CSRF protection with the `state` token.
 
-1. **DRY (Don't Repeat Yourself)**: OAuth logic centralized in service layer
-2. **Single Responsibility**: Each module has one job
-3. **Dependency Injection**: FastAPI dependencies for testability
-4. **Repository Pattern**: Clean separation of data access
-5. **Service Layer**: Business logic isolated from HTTP concerns
+### Why Google redirects to the backend instead of the frontend
+
+- The authorization code is exchanged server-side.
+- Google client secret never touches the browser.
+- User creation and account linking happen in one place.
+- The frontend does not need to understand Google token exchange details.
+
+### Why the backend resolves claims from multiple sources
+
+Google can return slightly different claim sets depending on the granted scopes and endpoint behavior. To avoid brittle login failures, the backend resolves identity in this order:
+
+1. `userinfo`
+2. `id_token` claims
+3. `tokeninfo`
+
+That gives the system a reliable fallback chain without changing the frontend contract.
 
 ---
 
-## OAuth Lifecycle
+## Lifecycle
 
-### Complete Flow Diagram
+### End-to-end flow
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        GOOGLE OAuth FLOW                                    │
-└─────────────────────────────────────────────────────────────────────────────┘
+1. Frontend requests `GET /api/v1/auth/oauth/google/url`.
+2. Backend generates a secure `state` value and stores it in Redis.
+3. Backend returns a Google authorization URL.
+4. Frontend redirects the browser to Google immediately.
+5. User chooses an account and grants consent.
+6. Google redirects the browser to `GET /api/v1/auth/oauth/google/callback`.
+7. Backend validates the `state`.
+8. Backend exchanges the authorization `code` for Google tokens.
+9. Backend fetches user identity from Google.
+10. Backend finds or creates the local Momodu user.
+11. Backend creates or updates the OAuth account link.
+12. Backend issues Momodu JWT access and refresh tokens.
+13. Backend returns those tokens as JSON.
+14. Frontend stores the Momodu tokens and moves the user into the app.
 
-1. FRONTEND REQUESTS OAUTH URL
-   ┌─────────────────────────────────────────────────────────────────────────┐
-   │  GET /api/v1/auth/oauth/google/url                                      │
-   │  Query params: redirect_url (optional)                                 │
-   │         ↓                                                                │
-   │  Backend generates cryptographically secure state token               │
-   │         ↓                                                                │
-   │  State stored in Redis with 10-minute TTL                              │
-   │         ↓                                                                │
-   │  Returns: { url: "https://accounts.google.com/...", state: "xxx" }   │
-   └─────────────────────────────────────────────────────────────────────────┘
-                                    ↓
-2. FRONTEND REDIRECTS USER
-   ┌─────────────────────────────────────────────────────────────────────────┐
-   │  User redirected to Google OAuth consent screen                        │
-   │         ↓                                                                │
-   │  User sees: "Momodu wants to access your account"                     │
-   │         ↓                                                                │
-   │  Scopes requested:                                                      │
-   │    - openid                                                             │
-   │    - email                                                              │
-   │    - profile                                                            │
-   │    - userinfo.email                                                     │
-   │    - userinfo.profile                                                   │
-   │         ↓                                                                │
-   │  User clicks "Continue" → authorization granted                        │
-   └─────────────────────────────────────────────────────────────────────────┘
-                                    ↓
-3. GOOGLE CALLS BACK
-   ┌─────────────────────────────────────────────────────────────────────────┐
-   │  GET /api/v1/auth/oauth/google/callback                                │
-   │  Query params: code=xxx&state=xxx                                      │
-   │         ↓                                                                │
-   │  Backend validates state token (CSRF protection)                       │
-   │         ↓                                                                │
-   │  State deleted from Redis (prevents replay attacks)                    │
-   │         ↓                                                                │
-   │  Exchange authorization code for tokens:                               │
-   │    - access_token (1 hour expiry)                                      │
-   │    - refresh_token (for silent re-auth)                                │
-   │    - id_token (JWT with user claims)                                    │
-   └─────────────────────────────────────────────────────────────────────────┘
-                                    ↓
-4. BACKEND RESOLVES USER
-   ┌─────────────────────────────────────────────────────────────────────────┐
-   │  Get user info from Google:                                            │
-   │    GET https://www.googleapis.com/oauth2/v3/userinfo                  │
-   │    Header: Bearer ACCESS_TOKEN                                         │
-   │         ↓                                                                │
-   │  Response:                                                             │
-   │    {                                                                    │
-   │      "sub": "123456789",  // Google user ID                            │
-   │      "email": "user@gmail.com",                                       │
-   │      "email_verified": true,                                           │
-   │      "name": "John Doe",                                               │
-   │      "picture": "https://..."                                          │
-   │    }                                                                    │
-   │         ↓                                                                │
-   │  Resolve user (3 steps):                                               │
-   │    1. Check OAuthAccount exists with (provider, provider_user_id)    │
-   │       → Return linked user                                             │
-   │    2. Check User exists with same email                                │
-   │       → Link existing user to OAuth                                    │
-   │    3. Create new User + OAuthAccount                                   │
-   └─────────────────────────────────────────────────────────────────────────┘
-                                    ↓
-5. SAVE OAUTH ACCOUNT & GENERATE JWT
-   ┌─────────────────────────────────────────────────────────────────────────┐
-   │  Save OAuth tokens to database:                                         │
-   │    - access_token (for Google API calls)                               │
-   │    - refresh_token (for token refresh)                                 │
-   │    - id_token (for identity verification)                              │
-   │    - token_expires_at                                                  │
-   │    - scope                                                             │
-   │         ↓                                                                │
-   │  Generate JWT tokens:                                                  │
-   │    - access_token (60 min) - for API access                            │
-   │    - refresh_token (7 days) - for token refresh                       │
-   │         ↓                                                                │
-   │  Return to frontend:                                                    │
-   │    {                                                                    │
-   │      "access_token": "eyJ...",                                         │
-   │      "refresh_token": "eyJ...",                                         │
-   │      "token_type": "bearer",                                           │
-   │      "expires_in": 3600,                                               │
-   │      "user_id": "uuid",                                                │
-   │      "email": "user@gmail.com"                                         │
-   │    }                                                                    │
-   └─────────────────────────────────────────────────────────────────────────┘
-```
+### Fast-feeling frontend pattern
+
+For the frontend to feel fast and smooth:
+
+- call `/auth/oauth/google/url` only when the user explicitly clicks continue with Google
+- redirect the browser immediately after receiving the URL
+- do not construct a Google URL in the browser
+- do not run a separate frontend-only Google auth SDK flow unless the backend is redesigned for it
+- keep the callback page very light and immediately hand control to app auth state
+
+The backend callback currently returns JSON. The smooth frontend approach is:
+
+- open the backend callback in the main window
+- let the backend return tokens
+- have the frontend callback page read them and finish login
+
+If later you want a cleaner browser UX, a common next step is to make the backend callback redirect to a frontend route with a short-lived handoff token instead of raw JSON. That is not the current implementation.
 
 ---
 
 ## API Endpoints
 
-### 1. Get OAuth Authorization URL
+### `GET /api/v1/auth/oauth/google/url`
 
-Generate Google OAuth URL for frontend to redirect user.
+Returns a backend-generated Google authorization URL and the CSRF `state` value.
 
-| Property | Value |
-|----------|-------|
-| **URL** | `/api/v1/auth/oauth/google/url` |
-| **Method** | GET |
-| **Auth Required** | No |
-
-**Query Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `redirect_url` | string | No | URL to redirect after OAuth completion |
-
-**Response (200):**
+Response shape:
 
 ```json
 {
-  "url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...&redirect_uri=...&response_type=code&scope=openid+email+profile&state=xxx&access_type=offline&prompt=consent",
-  "state": "random_state_token_32_chars"
+  "url": "https://accounts.google.com/o/oauth2/v2/auth?...",
+  "state": "secure-random-state"
 }
 ```
 
-**State Token Security:**
-- Generated using `secrets.token_urlsafe(32)` - cryptographically secure
-- Stored in Redis with 10-minute TTL
-- Validated on callback and deleted to prevent replay attacks
+Notes:
 
----
+- `redirect_url` is optional and can be supplied by the frontend
+- the backend stores the generated state in Redis
 
-### 2. Handle OAuth Callback
+### `GET /api/v1/auth/oauth/google/callback`
 
-Process Google's redirect after user authorizes.
+Handles the Google redirect back to the backend.
 
-| Property | Value |
-|----------|-------|
-| **URL** | `/api/v1/auth/oauth/google/callback` |
-| **Method** | GET |
-| **Auth Required** | No |
+Expected query params:
 
-**Query Parameters:**
+- `code`
+- `state`
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `code` | string | Yes | Authorization code from Google |
-| `state` | string | Yes | State token for CSRF validation |
+Google may also send:
 
-**Response (200):**
+- `iss`
+- `scope`
+- `authuser`
+- `prompt`
+
+Success response shape:
 
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "access_token": "momodu-jwt-access-token",
+  "refresh_token": "momodu-jwt-refresh-token",
   "token_type": "bearer",
-  "expires_in": 3600,
-  "user_id": "6985b7e2-3ef3-433c-ac78-f5f088dd8b3a",
-  "email": "user@gmail.com"
+  "expires_in": 1800,
+  "user_id": "uuid",
+  "email": "user@example.com"
 }
 ```
 
-**Error Responses:**
+### `GET /api/v1/auth/oauth/accounts`
 
-```json
-{
-  "detail": "Invalid or expired OAuth state token. Please try again."
-}
-// Status: 400
+Returns the current user’s linked OAuth accounts.
 
-{
-  "detail": "Failed to exchange authorization code: ..."
-}
-// Status: 400
+### `DELETE /api/v1/auth/oauth/accounts/{account_id}`
 
-{
-  "detail": "OAuth authentication failed. Please try again."
-}
-// Status: 500
-```
+Marks a linked OAuth account inactive.
+
+### `POST /api/v1/auth/oauth/refresh`
+
+Refreshes Google access tokens using a stored refresh token.
 
 ---
 
-### 3. Get User's OAuth Accounts
+## Frontend Flow
 
-List all OAuth accounts linked to the current user.
+## Recommended frontend contract
 
-| Property | Value |
-|----------|-------|
-| **URL** | `/api/v1/auth/oauth/accounts` |
-| **Method** | GET |
-| **Auth Required** | Yes (JWT) |
+The frontend should treat the backend as the source of truth for the entire OAuth handshake.
 
-**Response (200):**
+### Step 1: Ask backend for the URL
 
-```json
-[
-  {
-    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "provider": "google",
-    "provider_user_id": "123456789",
-    "scope": "openid email profile",
-    "is_active": true,
-    "created_at": "2026-04-15T10:00:00"
+```ts
+async function beginGoogleLogin() {
+  const res = await fetch("/api/v1/auth/oauth/google/url", {
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to start Google login");
   }
-]
-```
 
----
-
-### 4. Unlink OAuth Account
-
-Disconnect an OAuth provider from user's account.
-
-| Property | Value |
-|----------|-------|
-| **URL** | `/api/v1/auth/oauth/accounts/{account_id}` |
-| **Method** | DELETE |
-| **Auth Required** | Yes (JWT) |
-
-**Response (200):**
-
-```json
-{
-  "message": "OAuth account unlinked successfully"
+  const data = await res.json();
+  sessionStorage.setItem("oauth_state", data.state);
+  window.location.href = data.url;
 }
 ```
 
----
+### Step 2: Let Google return to the backend callback
 
-### 5. Refresh OAuth Token
+Google redirects to:
 
-Refresh access token without re-authentication.
-
-| Property | Value |
-|----------|-------|
-| **URL** | `/api/v1/auth/oauth/refresh` |
-| **Method** | POST |
-| **Auth Required** | No |
-
-**Query Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `refresh_token` | string | Yes | OAuth refresh token |
-| `provider` | string | No | Provider name (default: google) |
-
-**Response (200):**
-
-```json
-{
-  "access_token": "new_access_token",
-  "refresh_token": "new_or_same_refresh_token",
-  "expires_at": 1234567890
-}
+```text
+/api/v1/auth/oauth/google/callback?code=...&state=...
 ```
 
----
+The frontend should not try to exchange the code itself.
 
-## Database Schema
+### Step 3: Complete login in the browser
 
-### OAuthAccount Table
+Because the current backend callback returns JSON, the simplest frontend callback page is a thin page that:
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID | Primary key |
-| `user_id` | UUID | Foreign key to accounts_user |
-| `provider` | VARCHAR(50) | OAuth provider (google, github) |
-| `provider_user_id` | VARCHAR(255) | Provider's user ID |
-| `access_token` | TEXT | OAuth access token |
-| `refresh_token` | TEXT | OAuth refresh token |
-| `id_token` | TEXT | OAuth ID token |
-| `token_expires_at` | TIMESTAMP | Token expiration |
-| `scope` | VARCHAR(500) | OAuth scopes |
-| `extra_data` | TEXT | Extra provider data (JSON) |
-| `is_active` | BOOLEAN | Account active status |
-| `created_at` | TIMESTAMP | Creation timestamp |
-| `updated_at` | TIMESTAMP | Update timestamp |
+- lands on the backend callback response
+- reads the JSON payload
+- stores the Momodu tokens
+- redirects into the main app
 
-**Indexes:**
-- `unique: (provider, provider_user_id)` - Prevent duplicate links
-- `index: (user_id, provider)` - User's OAuth accounts lookup
-- `index: (user_id, provider, is_active)` - Active accounts lookup
+If you later move to a dedicated frontend callback route, keep the backend responsible for Google code exchange and return a frontend-safe handoff instead of rebuilding the flow in the browser.
+
+## Anti-patterns to avoid
+
+- Do not build the Google authorization URL manually in the frontend.
+- Do not use a separate Google popup or One Tap flow unless the backend explicitly supports that token shape.
+- Do not reuse callback URLs. Google authorization codes are one-time use.
+- Do not assume Google always returns the same claim set from one endpoint.
 
 ---
 
-## Security Considerations
+## File Map
 
-### 1. CSRF Protection
+This is the current circle of files involved in the flow and what each one does.
 
-- State token generated with `secrets.token_urlsafe(32)`
-- State stored in Redis with 10-minute TTL
-- State deleted after validation (prevents replay)
-- Frontend must validate state matches
+### `backend/apps/api/config.py`
 
-### 2. Token Storage
+Purpose:
 
-- Access tokens stored in database (not encrypted in this implementation)
-- For production: encrypt tokens using `shared.utils.encrypt_token`
-- Refresh tokens enable long-lived sessions
+- loads FastAPI OAuth settings from environment
+- exposes `GOOGLE_CLIENT_ID`
+- exposes `GOOGLE_CLIENT_SECRET`
+- exposes `GOOGLE_REDIRECT_URI`
+- exposes Google scopes and URLs
 
-### 3. Token Rotation
+Why it matters:
 
-- Request `access_type=offline` to get refresh token
-- `prompt=consent` forces consent to ensure refresh token
-- Refresh token used for silent re-authentication
+- this is the single source of truth for runtime OAuth configuration in FastAPI
 
-### 4. Scope Choices
+### `backend/apps/api/v1/auth/oauth.py`
 
-**Chosen scopes:**
-```python
-GOOGLE_SCOPES = [
-    "openid",           # Standard OAuth 2.0
-    "email",           # Access email
-    "profile",         # Access profile
-    "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/userinfo.profile",
-]
-```
+Purpose:
 
-**Why these scopes:**
-- `openid`: Required for OpenID Connect compliance
-- `email`: Get user's email (primary identifier)
-- `profile`: Get name, picture for user profile
-- `userinfo.email` / `userinfo.profile`: More detailed user info
+- builds the Google authorization URL
+- exchanges authorization codes for tokens
+- refreshes Google tokens
+- fetches `userinfo`
+- fetches `tokeninfo`
+- normalizes Google identity payloads into one shape
+
+Why it matters:
+
+- this is the low-level Google client wrapper
+- scope encoding correctness here directly determines whether email claims are granted
+
+### `backend/apps/api/v1/auth/services/oauth_service.py`
+
+Purpose:
+
+- contains the business logic for the OAuth callback
+- validates state when applicable
+- orchestrates token exchange
+- merges Google claims from multiple sources
+- resolves whether the local user already exists
+- creates new local users when needed
+- issues Momodu JWT access and refresh tokens
+
+Why it matters:
+
+- this is the core lifecycle coordinator for Google login
+
+### `backend/apps/api/v1/routers/oauth.py`
+
+Purpose:
+
+- exposes the HTTP routes for the OAuth flow
+- returns the generated Google URL
+- receives the Google callback
+- converts service-layer failures into API responses
+
+Why it matters:
+
+- this is the public API boundary for frontend integration
+
+### `backend/apps/api/v1/auth/deps/oauth_dependencies.py`
+
+Purpose:
+
+- stores and validates OAuth state tokens
+- uses Redis to provide CSRF protection and one-time state usage
+
+Why it matters:
+
+- this is what prevents replay and cross-site request forgery in the login flow
+
+### `backend/apps/api/v1/repositories/oauth_repository.py`
+
+Purpose:
+
+- reads and writes OAuth account link records
+- finds existing OAuth links by provider and Google subject
+- updates stored OAuth tokens
+
+Why it matters:
+
+- this is the persistence layer for Google account linkage
+
+### `backend/apps/api/v1/repositories/user.py`
+
+Purpose:
+
+- finds local users by email or id
+- creates local users for first-time OAuth signups
+
+Why it matters:
+
+- this is how Google identity becomes a Momodu user account
+
+### `backend/shared/models/oauth.py`
+
+Purpose:
+
+- defines the SQLAlchemy model used by FastAPI for OAuth account records
+
+Why it matters:
+
+- this model must match the real Django-created database table name and columns
+- it currently maps to Django’s `accounts_oauthaccount` table
+
+### `backend/shared/models/users.py`
+
+Purpose:
+
+- defines the SQLAlchemy model used by FastAPI for the local user table
+
+Why it matters:
+
+- FastAPI user creation and lookup rely on this mapping matching Django’s schema
+
+### `backend/apps/accounts/models.py`
+
+Purpose:
+
+- defines the Django-side user and OAuth account models
+
+Why it matters:
+
+- Django migrations are created from this side of the codebase
+- FastAPI SQLAlchemy models must remain aligned with these tables
+
+### `backend/apps/accounts/migrations/0002_oauth_accounts.py`
+
+Purpose:
+
+- creates the Django OAuth account table in the database
+
+Why it matters:
+
+- if this migration exists but the FastAPI SQLAlchemy model points to the wrong table name, OAuth login will fail even though migrations are applied
+
+### `backend/run_api.py`
+
+Purpose:
+
+- starts the FastAPI app with Uvicorn
+- loads `.env`
+
+Why it matters:
+
+- the server must start from the `backend` directory so the intended `.env` file is loaded
+
+---
+
+## Database Notes
+
+### OAuth account storage
+
+The active FastAPI OAuth repository uses the SQLAlchemy model in `backend/shared/models/oauth.py`.
+
+That model must stay aligned with the Django migration-created schema:
+
+- table name
+- column names
+- UUID types
+- index expectations
+
+### Important compatibility rule
+
+If Django owns the schema and FastAPI uses SQLAlchemy models against the same database, both sides must describe the same tables. If one side renames a table without the other, the OAuth flow will fail after Google login succeeds.
+
+---
+
+## Logging Guidance
+
+The current logging is intentionally moderate:
+
+- it logs whether Google returned an email
+- it logs whether refresh and ID tokens are present
+- it logs stable identifiers like Google `sub` and local `user_id`
+- it avoids logging access tokens, refresh tokens, ID tokens, and raw claim payloads
+- it avoids logging user email during normal success paths
+
+This keeps the flow debuggable during review without unnecessarily leaking secrets or personal data.
 
 ---
 
 ## Configuration
 
-### Environment Variables
-
 Add to `backend/.env`:
 
 ```env
-# Google OAuth (get from https://console.cloud.google.com/apis/credentials)
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:8001/api/v1/auth/oauth/google/callback
+GOOGLE_REDIRECT_URI=https://your-public-api-domain/api/v1/auth/oauth/google/callback
+GOOGLE_TOKEN_URL=https://oauth2.googleapis.com/token
+GOOGLE_USERINFO_URL=https://www.googleapis.com/oauth2/v3/userinfo
+GOOGLE_AUTH_URL=https://accounts.google.com/o/oauth2/v2/auth
+GOOGLE_ISSUER=https://accounts.google.com
 ```
 
-### Google Cloud Console Setup
-
-1. Go to https://console.cloud.google.com/apis/credentials
-2. Create OAuth 2.0 Client ID
-3. Set **Authorized redirect URIs** to:
-   ```
-   http://localhost:8001/api/v1/auth/oauth/google/callback
-   ```
-4. Copy Client ID and Client Secret to `.env`
+For this project, if you are exposing the local server through Cloudflare Tunnel, `GOOGLE_REDIRECT_URI` must use the public tunnel URL, not localhost.
 
 ---
 
-## Frontend Integration Example
+## Google Cloud Console Setup
 
-### JavaScript/TypeScript
+In Google Cloud Console:
 
-```typescript
-// Step 1: Get OAuth URL
-async function getGoogleOAuthUrl(redirectUrl?: string) {
-  const params = redirectUrl ? `?redirect_url=${encodeURIComponent(redirectUrl)}` : '';
-  const response = await fetch(`/api/v1/auth/oauth/google/url${params}`);
-  return response.json();
-}
+1. Create or open the OAuth client.
+2. Set the authorized redirect URI to your backend callback URL.
+3. Make sure the redirect URI exactly matches `GOOGLE_REDIRECT_URI`.
 
-// Step 2: Redirect user
-const { url, state } = await getGoogleOAuthUrl('http://localhost:3000/dashboard');
-// Save state to sessionStorage for validation
-sessionStorage.setItem('oauth_state', state);
-window.location.href = url;
+Example:
 
-// Step 3: Handle callback
-// After redirect, parse URL params
-const urlParams = new URLSearchParams(window.location.search);
-const code = urlParams.get('code');
-const returnedState = urlParams.get('state');
-
-// Validate state
-const savedState = sessionStorage.getItem('oauth_state');
-if (returnedState !== savedState) {
-  throw new Error('State mismatch - possible CSRF');
-}
-
-// Exchange code for tokens
-const response = await fetch(
-  `/api/v1/auth/oauth/google/callback?code=${code}&state=${returnedState}`
-);
-const tokens = await response.json();
-
-// Store tokens
-localStorage.setItem('access_token', tokens.access_token);
-localStorage.setItem('refresh_token', tokens.refresh_token);
+```text
+https://momoduxp.michealchinemeluugwu.xyz/api/v1/auth/oauth/google/callback
 ```
 
----
-
-## Testing the OAuth Flow
-
-### Step 1: Get OAuth URL
-
-```bash
-curl -X GET "http://localhost:8001/api/v1/auth/oauth/google/url"
-```
-
-Response:
-```json
-{
-  "url": "https://accounts.google.com/o/oauth2/v2/auth?...",
-  "state": "abc123..."
-}
-```
-
-### Step 2: Copy URL and Authenticate
-
-1. Copy the `url` value
-2. Open in browser
-3. Complete Google authentication
-
-### Step 3: Check Callback
-
-After authentication, you'll be redirected to:
-```
-http://localhost:8001/api/v1/auth/oauth/google/callback?code=xxx&state=xxx
-```
-
-### Step 4: Verify Tokens
-
-```bash
-# Use returned access_token
-curl -X GET "http://localhost:8001/api/v1/posts" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
+Exact matching matters. Scheme, domain, path, and trailing slash behavior must line up.
 
 ---
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Invalid client ID | Check GOOGLE_CLIENT_ID in .env |
-| Redirect URI mismatch | Verify GOOGLE_REDIRECT_URI matches Google Console |
-| State token expired | State expires in 10 minutes - must complete auth quickly |
-| No refresh token | Ensure `access_type=offline` and `prompt=consent` in auth URL |
-| Email not returned | User may have hidden email - handle optional email |
+### `Google account must have an email address`
+
+Likely causes:
+
+- scope string was malformed or not URL-encoded
+- Google granted only `openid`
+- callback was initiated from a different flow than `/google/url`
+
+### `invalid_grant`
+
+Likely causes:
+
+- callback URL was reused
+- authorization code expired
+- authorization code was already consumed by the backend once
+
+### `OAuth state not found in Redis`
+
+Likely causes:
+
+- callback was retried after a previous attempt
+- state expired
+- browser used an old callback URL
+
+### `relation "... does not exist"`
+
+Likely causes:
+
+- FastAPI SQLAlchemy model points to the wrong table name
+- Django and FastAPI are using mismatched schema assumptions
+
+---
+
+## Summary
+
+The Google OAuth implementation is now stable around one rule:
+
+- the backend owns the Google handshake
+
+That is the main reason the flow now works reliably. The frontend contract should stay thin and should not reconstruct any part of the Google exchange logic that already exists on the server.

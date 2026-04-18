@@ -32,18 +32,21 @@ router = APIRouter(prefix="/auth/oauth", tags=["OAuth"])
 
 class OAuthUrlResponse(BaseModel):
     """Response with OAuth authorization URL."""
+
     url: str
     state: str
 
 
 class OAuthCallbackRequest(BaseModel):
     """Request with OAuth callback parameters."""
+
     code: str
     state: str
 
 
 class OAuthTokenResponse(BaseModel):
     """Response with JWT tokens after OAuth login."""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -54,6 +57,7 @@ class OAuthTokenResponse(BaseModel):
 
 class OAuthAccountResponse(BaseModel):
     """Response with OAuth account info."""
+
     id: str
     provider: str
     provider_user_id: str
@@ -74,21 +78,21 @@ async def get_google_oauth_url(
 ):
     """
     Get Google OAuth authorization URL.
-    
+
     Returns a URL that the frontend should redirect the user to.
     The state parameter is included for CSRF protection.
-    
+
     Example redirect URL:
         http://localhost:3000/oauth/callback
     """
     auth_url = await get_google_authorization_url()
-    
+
     # Store state in Redis with optional redirect URL
     if redirect_url:
         state_manager.store_state(auth_url.state, redirect_url=redirect_url)
     else:
         state_manager.store_state(auth_url.state)
-    
+
     return OAuthUrlResponse(
         url=auth_url.url,
         state=auth_url.state,
@@ -98,23 +102,26 @@ async def get_google_oauth_url(
 @router.get("/google/callback", response_model=OAuthTokenResponse)
 async def google_oauth_callback(
     code: str = Query(..., description="Authorization code from Google"),
-    state: str = Query(..., description="State token for CSRF validation"),
+    state: str = Query(
+        None, description="State token for CSRF validation (optional for OIDC)"
+    ),
     db: AsyncSession = Depends(get_db),
     state_manager: OAuthStateManager = Depends(OAuthStateManager),
 ):
     """
     Handle Google OAuth callback.
-    
+
     This endpoint is called by Google after user authorizes the application.
     It exchanges the authorization code for tokens and creates/links user account.
     """
-    # Validate state token (CSRF protection)
-    if not state_manager.validate_state(state):
+    # Validate state token if provided (CSRF protection)
+    # State is optional for OpenID Connect flows
+    if state and not state_manager.validate_state(state):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired OAuth state token. Please try again.",
         )
-    
+
     try:
         tokens = await handle_google_callback(
             db=db,
@@ -133,7 +140,7 @@ async def google_oauth_callback(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="OAuth authentication failed. Please try again.",
         )
-    
+
     return OAuthTokenResponse(
         access_token=tokens.access_token,
         refresh_token=tokens.refresh_token,
@@ -150,11 +157,11 @@ async def google_oauth_error(
 ):
     """
     Handle Google OAuth errors.
-    
+
     This endpoint is called by Google when there's an error during OAuth.
     """
     logger.error("Google OAuth error: %s - %s", error, error_description)
-    
+
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"OAuth error: {error_description or error}",
@@ -173,11 +180,11 @@ async def get_oauth_accounts(
 ):
     """
     Get all OAuth accounts linked to the current user.
-    
+
     Returns list of connected OAuth providers (Google, GitHub, etc.)
     """
     accounts = await get_user_oauth_accounts(db, str(user.id))
-    
+
     return [
         OAuthAccountResponse(
             id=str(acc.id),
@@ -199,12 +206,12 @@ async def unlink_oauth_account(
 ):
     """
     Unlink an OAuth account from the current user.
-    
+
     This disconnects the OAuth provider from the user's account.
     """
     import uuid
     from apps.api.v1.repositories.oauth_repository import delete_oauth_account
-    
+
     try:
         account_uuid = uuid.UUID(account_id)
     except ValueError:
@@ -212,19 +219,19 @@ async def unlink_oauth_account(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid account ID",
         )
-    
+
     # Verify ownership
     accounts = await get_user_oauth_accounts(db, str(user.id))
     account = next((acc for acc in accounts if str(acc.id) == account_id), None)
-    
+
     if not account:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="OAuth account not found",
         )
-    
+
     await delete_oauth_account(db, account_uuid)
-    
+
     return {"message": "OAuth account unlinked successfully"}
 
 
@@ -241,11 +248,11 @@ async def refresh_oauth_token(
 ):
     """
     Refresh OAuth access token.
-    
+
     Use this to get a new access token without re-authenticating.
     """
     from apps.api.v1.auth.services.oauth_service import refresh_oauth_token
-    
+
     try:
         new_tokens = await refresh_oauth_token(db, provider, refresh_token)
     except ValueError as e:
@@ -253,7 +260,7 @@ async def refresh_oauth_token(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
-    
+
     return {
         "access_token": new_tokens["access_token"],
         "refresh_token": new_tokens.get("refresh_token", refresh_token),

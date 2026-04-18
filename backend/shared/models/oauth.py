@@ -18,7 +18,7 @@ class OAuthAccount(Base):
     Links users to external OAuth providers (Google, GitHub, etc.)
     """
     
-    __tablename__ = "oauth_accounts"
+    __tablename__ = "accounts_oauthaccount"
     
     # Primary key
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

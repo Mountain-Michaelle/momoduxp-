@@ -4,24 +4,31 @@ from apps.core.models import BaseModel
 
 class PostStatus(models.TextChoices):
     DRAFT = "draft"
+    SCHEDULED = "scheduled"
     SENT_FOR_APPROVAL = "sent_for_approval"
     APPROVED = "approved"
+    QUEUED = "queued"
+    PUBLISHING = "publishing"
     PUBLISHED = "published"
     FAILED = "failed"
+    STOPPED = "stopped"
+
 
 class ScheduledPost(BaseModel):
-    author = models.ForeignKey('accounts.User', on_delete=models.CASCADE)
-    account = models.ForeignKey('accounts.SocialPlatformAccount', on_delete=models.CASCADE)
-    
+    author = models.ForeignKey("accounts.User", on_delete=models.CASCADE)
+    account = models.ForeignKey(
+        "accounts.SocialPlatformAccount", on_delete=models.CASCADE
+    )
+
     content = models.TextField()
-    media_urls = models.JSONField(default=list, blank=True) # For images/videos
-    
+    media_urls = models.JSONField(default=list, blank=True)  # For images/videos
+
     status = models.CharField(
-            max_length=32, choices=PostStatus.choices, default=PostStatus.DRAFT
-        )   
-     
+        max_length=32, choices=PostStatus.choices, default=PostStatus.DRAFT
+    )
+
     scheduled_for = models.DateTimeField()
-    approval_deadline = models.DateTimeField() # 5hr mark for auto-post
+    approval_deadline = models.DateTimeField()  # 5hr mark for auto-post
     approved_at = models.DateTimeField(null=True, blank=True)
 
     # Metadata for tracking
